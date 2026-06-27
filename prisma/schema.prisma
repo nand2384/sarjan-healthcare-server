@@ -1,0 +1,72 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model RoleMaster {
+  role_id BigInt @id @default(autoincrement())
+
+  role_name   String  @unique
+  description String?
+
+  display_order Int
+
+  is_active Boolean @default(true)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  @@map("role_master")
+}
+
+model MainMaster {
+  master_id BigInt @id @default(autoincrement())
+
+  master_name String @unique
+  description String?
+
+  display_order Int
+  is_active Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  values ValueMaster[]
+
+  @@map("main_master")
+}
+
+model ValueMaster {
+  value_id BigInt @id @default(autoincrement())
+
+  master_id BigInt
+
+  value_name String
+  description String?
+
+  display_order Int
+  is_active Boolean @default(true)
+
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  deleted_at    DateTime?
+
+  main_master   MainMaster @relation(fields: [master_id], references: [master_id])
+
+  @@unique([master_id, value_name])
+
+  @@index([master_id])
+
+  @@map("value_master")
+}

@@ -1,0 +1,33 @@
+import pino from "pino";
+import { env } from "../config/env";
+
+const logger = pino({
+    level: env.NODE_ENV === "development" ? "debug" : "info",
+    transport:
+        env.NODE_ENV === "development"
+            ? {
+                  target: "pino-pretty",
+                  options: {
+                      colorize: true,
+                      translateTime: "SYS:HH:MM:ss",
+                      ignore: "pid,hostname",
+                  },
+              }
+            : undefined,
+    redact: {
+        paths: [
+            "req.headers.authorization",
+            "req.headers.cookie",
+            "authorization",
+            "cookie",
+            "password",
+            "confirmPassword",
+            "accessToken",
+            "refreshToken",
+            "token",
+        ],
+        remove: true,
+    },
+});
+
+export default logger;

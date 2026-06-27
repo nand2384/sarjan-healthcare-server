@@ -1,16 +1,12 @@
 import dotenv from "dotenv";
-
+import { envSchema } from "./env.schema";
 dotenv.config();
 
-const requiredEnvVars = ["PORT", "NODE_ENV"];
+const parsedEnv = envSchema.safeParse(process.env);
 
-for (const envVar of requiredEnvVars) {
-    if (!process.env[envVar]) {
-        throw new Error(`Missing required environment variable: ${envVar}`);
-    }
+if (!parsedEnv.success) {
+    console.error("Invalid environment variables:", parsedEnv.error.format());
+    process.exit(1);
 }
 
-export const env = Object.freeze({
-    PORT: Number(process.env.PORT),
-    NODE_ENV: process.env.NODE_ENV!,
-});
+export const env = Object.freeze(parsedEnv.data);

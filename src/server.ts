@@ -1,8 +1,24 @@
 import app from "./app";
 import { env } from "./config/env";
+import { appContext } from "./app.context";
 
-const PORT = env.PORT;
+import { connectDatabase } from "./database";
+import { shutdown } from "./shutdown";
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+async function startServer() {
+    await connectDatabase();
+
+    app.listen(env.PORT, () => {
+        appContext.logger.info(`Server is running on port ${env.PORT}`);
+    });
+}
+
+process.on("SIGINT", () => {
+    void shutdown("SIGINT");
 });
+
+process.on("SIGTERM", () => {
+    void shutdown("SIGTERM");
+});
+
+startServer();
