@@ -1,8 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 
-import { logger } from "../logger";
-import { AppError } from "../errors";
-import { ErrorCode } from "../errors";
+import { logger } from "@logger";
+import { AppError, ErrorCode } from "@errors";
+import { ZodError } from "zod";
 
 export function errorHandler(error: Error, req: Request, res: Response, _next: NextFunction): void {
     logger.error(
@@ -10,10 +10,29 @@ export function errorHandler(error: Error, req: Request, res: Response, _next: N
             requestId: req.requestId,
             method: req.method,
             url: req.originalUrl,
-            error,
+            error: {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+            },
         },
         "Unhandled request error.",
     );
+
+    if (error instanceof ZodError) {
+        res.status(400).json({
+            success: false,
+            error: {
+                code: ErrorCode.VALIDATION_ERROR,
+                message: "Validation failed.",
+                details: Object.fromEntries(
+                    error.issues.map((issue) => [issue.path.join("."), issue.message]),
+                ),
+            },
+        });
+
+        return;
+    }
 
     if (error instanceof AppError) {
         res.status(error.statusCode).json({

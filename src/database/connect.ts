@@ -1,5 +1,5 @@
 import prisma from "./prisma";
-import { logger } from "../logger";
+import { logger } from "@logger";
 
 export async function connectDatabase(): Promise<void> {
     try {

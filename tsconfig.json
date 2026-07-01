@@ -5,6 +5,30 @@
         "rootDir": "./src",
         "outDir": "./dist",
 
+        "baseUrl": "./src",
+        "ignoreDeprecations": "6.0",
+
+        "paths": {
+            "@config": ["config"],
+            "@database": ["database"],
+            "@errors": ["errors"],
+            "@logger": ["logger"],
+            "@middleware": ["middleware"],
+            "@cache": ["cache"],
+            "@scheduler": ["scheduler"],
+
+            "@modules": ["modules"],
+            "@modules/*": ["modules/*"],
+
+            "@types": ["types"],
+            "@types/*": ["types/*"],
+
+            "@utils": ["utils"],
+            "@utils/*": ["utils/*"],
+
+            "@generated/*": ["generated/*"]
+        },
+
         // Environment Settings
         // See also https://aka.ms/tsconfig/module
         "module": "commonjs",

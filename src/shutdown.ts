@@ -1,3 +1,4 @@
+import { redisClient } from "@cache";
 import { disconnectDatabase } from "./database";
 import { logger } from "./logger";
 
@@ -6,6 +7,7 @@ export async function shutdown(signal: string): Promise<void> {
 
     try {
         await disconnectDatabase();
+        await redisClient.quit();
         logger.info("Disconnected from database");
         process.exit(0);
     } catch (error) {
