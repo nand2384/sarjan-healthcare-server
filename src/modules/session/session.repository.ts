@@ -4,7 +4,7 @@ export class SessionRepository {
     constructor(private readonly prisma: PrismaClient) {}
 
     public async createSession(
-        staffId: bigint,
+        staffId: number,
         ipAddress: string | null,
         userAgent: string | null,
         expiresAt: Date,
@@ -53,6 +53,49 @@ export class SessionRepository {
                     lt: new Date(),
                 },
             },
+        });
+    }
+
+    public async findActiveSessionsByStaffId(staffId: number) {
+        return await this.prisma.session.findMany({
+            where: {
+                staff_id: staffId,
+                expires_at: { gt: new Date() }
+            },
+            select: {
+                session_id: true,
+                ip_address: true,
+                user_agent: true,
+                expires_at: true,
+            },
+            orderBy: {
+                expires_at: 'desc'
+            }
+        });
+    }
+
+    public async findOtherSessionsByStaffId(staffId: number, currentSessionId: string) {
+        return await this.prisma.session.findMany({
+            where: {
+                staff_id: staffId,
+                session_id: {
+                    not: currentSessionId
+                }
+            },
+            select: {
+                session_id: true
+            }
+        });
+    }
+
+    public async deleteOtherSessions(staffId: number, currentSessionId: string) {
+        return await this.prisma.session.deleteMany({
+            where: {
+                staff_id: staffId,
+                session_id: {
+                    not: currentSessionId
+                }
+            }
         });
     }
 }

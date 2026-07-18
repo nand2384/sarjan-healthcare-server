@@ -5,7 +5,8 @@ import { UserRole } from "common/common.schema";
 
 export function roleMiddleware(...allowedRoles: UserRole[]) {
     return (req: Request, _res: Response, next: NextFunction) => {
-        const hasRole = req.session.roles.some((role) => allowedRoles.includes(role as UserRole));
+        const roles = req.session?.roles ?? [];
+        const hasRole = roles.some((role) => allowedRoles.includes(role as UserRole));
 
         if (!hasRole) {
             throw new AppError(

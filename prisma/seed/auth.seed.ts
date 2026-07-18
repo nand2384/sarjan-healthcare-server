@@ -36,7 +36,7 @@ export async function seedAuth() {
 
             username: env.DEFAULT_ADMIN_USERNAME,
 
-            mobile_number: env.DEFAULT_ADMIN_MOBILE_NUMBER,
+            mobile_number: String(env.DEFAULT_ADMIN_MOBILE_NUMBER),
             email: env.DEFAULT_ADMIN_EMAIL,
 
             password_hash: passwordHash,
@@ -45,6 +45,7 @@ export async function seedAuth() {
 
             is_system_account: true,
             is_disabled: false,
+            is_account_activated: true,
         },
     });
 

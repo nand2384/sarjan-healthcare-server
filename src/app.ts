@@ -3,19 +3,19 @@ import compression from "compression";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 
-import {
-    errorHandler,
-    notFoundMiddleware,
-    rateLimiter,
-    corsMiddleware,
-    requestIdMiddleware,
-    requestLoggerMiddleware,
-} from "./middleware";
+import { errorHandler, notFoundMiddleware, rateLimiter, corsMiddleware, requestIdMiddleware, requestLoggerMiddleware } from "./middleware";
 import router from "./routes";
+
+import { env } from "@config";
 
 const app = express();
 
-app.use(express.json());
+let trustProxy: string | number | boolean = env.TRUST_PROXY;
+if (trustProxy === "true") trustProxy = true;
+else if (trustProxy === "false") trustProxy = false;
+else if (!isNaN(Number(trustProxy))) trustProxy = Number(trustProxy);
+
+app.set('trust proxy', trustProxy);
 
 app.use(corsMiddleware);
 app.use(requestIdMiddleware);

@@ -18,5 +18,11 @@ export async function authMiddleware(req: Request, _res: Response, next: NextFun
 
     req.session = session;
 
+    req.auditContext = {
+        performed_by_staff_id: session.staff_id,
+        ip_address: req.ip || req.socket.remoteAddress || "",
+        user_agent: req.headers['user-agent'] || "",
+    };
+
     next();
 }

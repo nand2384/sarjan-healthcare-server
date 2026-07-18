@@ -12,8 +12,52 @@ datasource db {
   provider = "postgresql"
 }
 
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  RESET_PASSWORD
+  CHANGE_PASSWORD
+  ENABLE
+  DISABLE
+  ACTIVATE_ACCOUNT
+  RESEND_ACTIVATION_EMAIL
+  CHANGE_ROLE
+  FAILED_LOGIN_ATTEMPT
+}
+
+enum AuditEntityType {
+  STAFF
+  DOCTOR
+  PATIENT
+  APPOINTMENT
+  BILLING
+  LABORATORY
+  INVENTORY
+  WEBSITE
+  MASTER_DATA
+  ROLE
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum QueueType {
+  BOOKED
+  WALK_IN
+}
+
 model RoleMaster {
-  role_id BigInt @id @default(autoincrement())
+  role_id Int @id @default(autoincrement())
 
   role_name   String  @unique
   description String?
@@ -32,12 +76,12 @@ model RoleMaster {
 }
 
 model MainMaster {
-  master_id BigInt @id @default(autoincrement())
+  master_id Int @id @default(autoincrement())
 
   master_name String  @unique
   description String?
 
-  display_order Int?
+  display_order Int?    @default(0)
   is_active     Boolean @default(true)
 
   created_at DateTime  @default(now())
@@ -50,9 +94,9 @@ model MainMaster {
 }
 
 model ValueMaster {
-  value_id BigInt @id @default(autoincrement())
+  value_id Int @id @default(autoincrement())
 
-  master_id BigInt
+  master_id Int
 
   value_name  String
   description String?
@@ -69,24 +113,29 @@ model ValueMaster {
   staffs   Staff[]
   patients Patient[]
 
+  appointment_statuses          Appointment[]                @relation("AppointmentStatus")
+  visit_types                   Appointment[]                @relation("VisitType")
+  visit_reasons                 Appointment[]                @relation("VisitReason")
+  appointment_workflow_statuses AppointmentWorkflowHistory[] @relation("AppointmentWorkflowStatus")
+
   @@unique([master_id, value_name])
   @@index([master_id])
   @@map("value_master")
 }
 
 model Staff {
-  staff_id BigInt @id @default(autoincrement())
+  staff_id Int @id @default(autoincrement())
 
   first_name String
   last_name  String
 
-  username String @unique
+  username      String @unique
   mobile_number String @unique
   email         String @unique
 
   password_hash String?
 
-  gender_id BigInt
+  gender_id Int
 
   age Int?
 
@@ -97,7 +146,7 @@ model Staff {
 
   profile_image_url String?
 
-  is_disabled Boolean @default(false)
+  is_disabled       Boolean @default(false)
   is_system_account Boolean @default(false)
 
   last_login_at DateTime?
@@ -106,21 +155,39 @@ model Staff {
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
+  is_account_activated Boolean @default(false)
+
+  activation_token            String?   @unique
+  activation_token_expires_at DateTime?
+
   gender ValueMaster @relation(fields: [gender_id], references: [value_id])
 
   staff_roles    StaffRole[]
-  sessions Session[]
+  sessions       Session[]
+  audit_logs     AuditLog[]     @relation("StaffAuditLogs")
   doctor_profile DoctorProfile?
 
+  doctor_availabilities DoctorAvailability[] @relation("DoctorAvailability")
+
+  doctor_leaves DoctorLeave[] @relation("DoctorLeave")
+
+  doctor_appointments Appointment[] @relation("DoctorAppointments")
+
+  appointments_created Appointment[] @relation("AppointmentCreatedBy")
+
+  appointment_workflow_changes AppointmentWorkflowHistory[] @relation("AppointmentWorkflowChangedBy")
+
   @@index([gender_id])
+  @@index([username])
+  @@index([email])
   @@map("staff")
 }
 
 model StaffRole {
-  staff_role_id BigInt @id @default(autoincrement())
+  staff_role_id Int @id @default(autoincrement())
 
-  staff_id BigInt
-  role_id  BigInt
+  staff_id Int
+  role_id  Int
 
   is_default Boolean @default(false)
 
@@ -138,9 +205,9 @@ model StaffRole {
 }
 
 model Patient {
-  patient_id BigInt @id @default(autoincrement())
+  patient_id Int @id @default(autoincrement())
 
-  patient_account_id BigInt?
+  patient_account_id Int?
 
   uhid String @unique
 
@@ -151,7 +218,7 @@ model Patient {
   whatsapp_number String?
   email           String?
 
-  gender_id BigInt
+  gender_id Int
 
   age Int?
 
@@ -168,6 +235,7 @@ model Patient {
 
   gender          ValueMaster     @relation(fields: [gender_id], references: [value_id])
   patient_account PatientAccount? @relation(fields: [patient_account_id], references: [patient_account_id])
+  appointments    Appointment[]   @relation("PatientAppointments")
 
   @@index([gender_id])
   @@index([patient_account_id])
@@ -175,7 +243,7 @@ model Patient {
 }
 
 model PatientAccount {
-  patient_account_id BigInt @id @default(autoincrement())
+  patient_account_id Int @id @default(autoincrement())
 
   mobile_number String @unique
 
@@ -195,9 +263,9 @@ model PatientAccount {
 }
 
 model DoctorProfile {
-  doctor_profile_id BigInt @id @default(autoincrement())
+  doctor_profile_id Int @id @default(autoincrement())
 
-  staff_id BigInt @unique
+  staff_id Int @unique
 
   registration_number String? @unique
 
@@ -229,7 +297,7 @@ model DoctorProfile {
 model Session {
   session_id String @id @default(cuid())
 
-  staff_id BigInt
+  staff_id Int
   staff    Staff @relation(fields: [staff_id], references: [staff_id])
 
   ip_address String?
@@ -245,4 +313,195 @@ model Session {
   @@index([staff_id])
   @@index([expires_at])
   @@map("session")
+}
+
+model AuditLog {
+  audit_log_id BigInt @id @default(autoincrement())
+
+  performed_by_staff_id Int?
+
+  performed_by_staff Staff? @relation("StaffAuditLogs", fields: [performed_by_staff_id], references: [staff_id])
+
+  entity_type AuditEntityType
+
+  entity_id String
+
+  action AuditAction
+
+  old_values Json?
+  new_values Json?
+
+  ip_address String? @db.VarChar(45)
+  user_agent String?
+
+  created_at DateTime @default(now())
+
+  @@index([performed_by_staff_id])
+  @@index([entity_type])
+  @@index([entity_id])
+  @@index([action])
+  @@index([created_at])
+  @@map("audit_log")
+}
+
+model DoctorAvailability {
+  doctor_availability_id Int @id @default(autoincrement())
+
+  doctor_staff_id Int
+
+  day_of_week DayOfWeek
+
+  slot_name String
+
+  start_time DateTime @db.Time(0)
+  end_time   DateTime @db.Time(0)
+
+  maximum_appointments Int
+
+  display_order Int @default(0)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  doctor        Staff         @relation("DoctorAvailability", fields: [doctor_staff_id], references: [staff_id])
+  doctor_leaves DoctorLeave[]
+  appointments  Appointment[]
+
+  @@index([doctor_staff_id])
+  @@index([day_of_week])
+  @@map("doctor_availability")
+}
+
+model DoctorLeave {
+  doctor_leave_id Int @id @default(autoincrement())
+
+  doctor_staff_id Int
+
+  doctor_availability_id Int?
+
+  start_date DateTime @db.Date
+  end_date   DateTime @db.Date
+
+  reason String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  doctor Staff @relation("DoctorLeave", fields: [doctor_staff_id], references: [staff_id])
+
+  doctor_availability DoctorAvailability? @relation(fields: [doctor_availability_id], references: [doctor_availability_id])
+
+  @@index([doctor_staff_id])
+  @@index([doctor_availability_id])
+  @@index([start_date])
+  @@index([end_date])
+  @@map("doctor_leave")
+}
+
+model Appointment {
+  appointment_id Int @id @default(autoincrement())
+
+  patient_id Int
+
+  doctor_staff_id Int
+
+  doctor_availability_id Int
+
+  appointment_status_id Int
+
+  visit_type_id Int
+
+  visit_reason_id Int
+
+  created_by_staff_id Int
+
+  appointment_date DateTime @db.Date
+
+  appointment_remarks String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  patient Patient @relation("PatientAppointments", fields: [patient_id], references: [patient_id])
+
+  doctor Staff @relation("DoctorAppointments", fields: [doctor_staff_id], references: [staff_id])
+
+  doctor_availability DoctorAvailability @relation(fields: [doctor_availability_id], references: [doctor_availability_id])
+
+  appointment_status ValueMaster @relation("AppointmentStatus", fields: [appointment_status_id], references: [value_id])
+
+  visit_type ValueMaster @relation("VisitType", fields: [visit_type_id], references: [value_id])
+
+  visit_reason ValueMaster @relation("VisitReason", fields: [visit_reason_id], references: [value_id])
+
+  created_by_staff Staff @relation("AppointmentCreatedBy", fields: [created_by_staff_id], references: [staff_id])
+
+  appointment_workflow_history AppointmentWorkflowHistory[]
+
+  queue Queue?
+
+  @@index([patient_id])
+  @@index([doctor_staff_id])
+  @@index([doctor_availability_id])
+  @@index([appointment_status_id])
+  @@index([visit_type_id])
+  @@index([visit_reason_id])
+  @@index([created_by_staff_id])
+  @@index([appointment_date])
+  @@index([appointment_date, doctor_staff_id])
+  @@index([appointment_date, appointment_status_id])
+  @@map("appointment")
+}
+
+model AppointmentWorkflowHistory {
+  appointment_workflow_history_id Int @id @default(autoincrement())
+
+  appointment_id Int
+
+  appointment_workflow_status_id Int
+
+  changed_by_staff_id Int
+
+  remarks String?
+
+  created_at DateTime @default(now())
+
+  appointment Appointment @relation(fields: [appointment_id], references: [appointment_id])
+
+  appointment_workflow_status ValueMaster @relation("AppointmentWorkflowStatus", fields: [appointment_workflow_status_id], references: [value_id])
+
+  changed_by_staff Staff @relation("AppointmentWorkflowChangedBy", fields: [changed_by_staff_id], references: [staff_id])
+
+  @@index([appointment_id])
+  @@index([appointment_workflow_status_id])
+  @@index([changed_by_staff_id])
+  @@index([created_at])
+  @@map("appointment_workflow_history")
+}
+
+model Queue {
+  queue_id Int @id @default(autoincrement())
+
+  appointment_id Int @unique
+
+  queue_number Int
+
+  queue_type QueueType
+
+  joined_queue_at DateTime
+
+  joined_after_consultation_sequence Int
+
+  skip_count Int @default(0)
+
+  is_active Boolean @default(true)
+
+  created_at DateTime @default(now())
+
+  appointment Appointment @relation(fields: [appointment_id], references: [appointment_id])
+
+  @@index([queue_type])
+  @@index([joined_queue_at])
+  @@index([is_active])
+  @@map("queue")
 }

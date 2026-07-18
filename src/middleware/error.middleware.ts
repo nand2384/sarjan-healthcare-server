@@ -3,6 +3,7 @@ import { NextFunction, Request, Response } from "express";
 import { logger } from "@logger";
 import { AppError, ErrorCode } from "@errors";
 import { ZodError } from "zod";
+import { Prisma } from "@generated/prisma/client";
 
 export function errorHandler(error: Error, req: Request, res: Response, _next: NextFunction): void {
     logger.error(
@@ -31,6 +32,63 @@ export function errorHandler(error: Error, req: Request, res: Response, _next: N
             },
         });
 
+        return;
+    }
+
+    if (error instanceof SyntaxError && "body" in error) {
+        res.status(400).json({
+            success: false,
+            error: {
+                code: ErrorCode.BAD_REQUEST,
+                message: "Invalid JSON payload passed.",
+            },
+        });
+
+        return;
+    }
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2002") {
+            res.status(409).json({
+                success: false,
+                error: {
+                    code: ErrorCode.CONFLICT,
+                    message: "A record with this value already exists.",
+                    details: error.meta?.target,
+                },
+            });
+            return;
+        }
+
+        if (error.code === "P2025") {
+            res.status(404).json({
+                success: false,
+                error: {
+                    code: ErrorCode.NOT_FOUND,
+                    message: "Record not found.",
+                },
+            });
+            return;
+        }
+
+        res.status(400).json({
+            success: false,
+            error: {
+                code: ErrorCode.BAD_REQUEST,
+                message: "Database operation failed.",
+            },
+        });
+        return;
+    }
+
+    if (error instanceof Prisma.PrismaClientValidationError) {
+        res.status(400).json({
+            success: false,
+            error: {
+                code: ErrorCode.BAD_REQUEST,
+                message: "Database validation failed.",
+            },
+        });
         return;
     }
 

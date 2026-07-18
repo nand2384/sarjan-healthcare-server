@@ -1,5 +1,5 @@
 export interface StaffWithRoles {
-    staff_id: bigint;
+    staff_id: number;
     username: string;
 
     staff_roles: {
@@ -7,4 +7,12 @@ export interface StaffWithRoles {
             role_name: string;
         };
     }[];
+}
+
+export interface RedisSessionData {
+    session_id: string;
+    staff_id: number;
+    username: string;
+    roles: string[];
+    expires_at: string;
 }
