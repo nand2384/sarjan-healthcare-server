@@ -16,7 +16,7 @@ export class AuthController {
         res.cookie(env.SESSION_COOKIE_NAME, session.session_id, {
             httpOnly: true,
             secure: env.NODE_ENV === "production",
-            sameSite: "strict",
+            sameSite: env.NODE_ENV === "production" ? "none" : "strict",
             maxAge: env.SESSION_TTL_SECONDS * 1000,
         });
 
