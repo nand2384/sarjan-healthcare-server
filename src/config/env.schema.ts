@@ -20,4 +20,7 @@ export const envSchema = z.object({
     EMAIL_PASS: z.string().min(1),
     EMAIL_FROM: z.string().min(1),
     TRUST_PROXY: z.string().default("1"),
+    PASSKEY_ORIGIN: z.url(),
+    PASSKEY_RP_ID: z.string(),
+    PASSKEY_RP_NAME: z.string(),
 });

@@ -56,6 +56,11 @@ enum QueueType {
   WALK_IN
 }
 
+enum PasskeyDeviceType {
+  SINGLE_DEVICE
+  MULTI_DEVICE
+}
+
 model RoleMaster {
   role_id Int @id @default(autoincrement())
 
@@ -160,6 +165,9 @@ model Staff {
   activation_token            String?   @unique
   activation_token_expires_at DateTime?
 
+  current_challenge      String?
+  challenge_created_at   DateTime?
+
   gender ValueMaster @relation(fields: [gender_id], references: [value_id])
 
   staff_roles    StaffRole[]
@@ -176,6 +184,8 @@ model Staff {
   appointments_created Appointment[] @relation("AppointmentCreatedBy")
 
   appointment_workflow_changes AppointmentWorkflowHistory[] @relation("AppointmentWorkflowChangedBy")
+
+  passkey_credentials PasskeyCredential[]
 
   @@index([gender_id])
   @@index([username])
@@ -342,6 +352,36 @@ model AuditLog {
   @@index([action])
   @@index([created_at])
   @@map("audit_log")
+}
+
+model PasskeyCredential {
+  id               String   @id @default(cuid())
+
+  staff_id         Int
+
+  credential_id    String   @unique
+  public_key       Bytes
+
+  counter          BigInt
+
+  transports       String[]
+
+  device_type      PasskeyDeviceType
+
+  backed_up        Boolean
+
+  device_name    String?
+
+  last_used_at     DateTime?
+
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  staff Staff @relation(fields: [staff_id], references: [staff_id], onDelete: Cascade)
+
+  @@index([staff_id])
+
+  @@map("passkey_credential")
 }
 
 model DoctorAvailability {

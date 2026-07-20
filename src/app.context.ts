@@ -15,6 +15,8 @@ import { MasterRepository } from "@modules/master/master.repository";
 import { MasterService } from "@modules/master/master.service";
 import { DoctorRepository } from "@modules/doctor/doctor.repository";
 import { DoctorService } from "@modules/doctor/doctor.service";
+import { PasskeyRepository } from "@modules/passkey/passkey.repository";
+import { PasskeyService } from "@modules/passkey/passkey.service";
 
 const auditRepository = new AuditRepository(prisma);
 const auditService = new AuditService(auditRepository);
@@ -31,7 +33,6 @@ const healthService = new HealthService();
 
 const staffRoleRepository = new StaffRoleRepository(prisma);
 
-
 const masterRepository = new MasterRepository(prisma);
 const masterService = new MasterService(masterRepository, redisClient, auditService);
 
@@ -40,6 +41,9 @@ const staffService = new StaffService(prisma, staffRepository, staffRoleReposito
 
 const doctorRepository = new DoctorRepository(prisma);
 const doctorService = new DoctorService(prisma, doctorRepository, staffRepository, staffRoleRepository, auditService, mailerService);
+
+const passkeyRepository = new PasskeyRepository(prisma);
+const passkeyService = new PasskeyService(passkeyRepository, authRepository, sessionService);
 
 export const appContext = Object.freeze({
     logger,
@@ -55,5 +59,6 @@ export const appContext = Object.freeze({
         staffService,
         doctorService,
         mailerService,
+        passkeyService,
     },
 });
