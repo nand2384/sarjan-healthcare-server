@@ -24,9 +24,9 @@ export class ReceptionistService {
         let endDate: Date;
 
         if (startDateStr && endDateStr) {
-            startDate = new Date(startDateStr);
-            endDate = new Date(endDateStr);
-            endDate.setUTCHours(23, 59, 59, 999);
+            // Append time to parse as local time (Server time) instead of UTC midnight
+            startDate = new Date(`${startDateStr}T00:00:00`);
+            endDate = new Date(`${endDateStr}T23:59:59.999`);
         } else {
             const now = new Date();
             // Default to start of current month to end of next month

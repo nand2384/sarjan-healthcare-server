@@ -48,7 +48,7 @@ export class ReceptionistRepository {
     public async getAllAppointments(today: Date, tomorrow: Date) {
         return this.prisma.appointment.findMany({
             where: {
-                appointment_date: { gte: today, lt: tomorrow },
+                appointment_date: { gte: today, lte: tomorrow },
                 appointment_status: {
                     value_name: 'BOOKED'
                 }

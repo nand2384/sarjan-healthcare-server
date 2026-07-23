@@ -30,7 +30,7 @@ export class ReceptionistMapper {
         return {
             appointment_id: appt.appointment_id,
             doctor_staff_id: appt.doctor_staff_id,
-            date: appt.appointment_date ? appt.appointment_date.toISOString().split('T')[0] : '',
+            date: appt.appointment_date ? appt.appointment_date.toISOString() : '',
             status: statusName,
             ui_time_slot: uiTimeSlot,
             ui_is_arrived: isArrived,

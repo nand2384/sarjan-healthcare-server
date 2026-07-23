@@ -55,7 +55,26 @@ export class AuthService {
     }
 
     public async me(session: Express.Request["session"]) {
-        return session;
+        const staffId = Number(session.staff_id);
+        const profile = await this.authRepository.getProfileDetail(staffId);
+        
+        if (!profile) {
+            throw new AppError(404, ErrorCode.ACCOUNT_NOT_FOUND, "Account not found");
+        }
+
+        if (profile.deleted_at || profile.is_disabled) {
+            throw new AppError(401, ErrorCode.ACCOUNT_DISABLED, "Account has been disabled or deleted");
+        }
+
+        return {
+            staff_id: staffId,
+            username: profile.username,
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            email: profile.email,
+            mobile_number: profile.mobile_number,
+            roles: profile.staff_roles.map((role) => role.role.role_name.toLowerCase()),
+        };
     }
 
     public async verifyActivation(activationToken: string): Promise<VerifyActivationResponse> {

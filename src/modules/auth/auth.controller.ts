@@ -47,12 +47,16 @@ export class AuthController {
     }
 
     public async me(req: Request, res: Response) {
-        const session = await this.authService.me(req.session);
+        const data = await this.authService.me(req.session);
 
         const response: MeResponseDto = {
-            staff_id: Number(session.staff_id),
-            username: session.username,
-            roles: session.roles as MeResponseDto["roles"],
+            staff_id: Number(data.staff_id),
+            username: data.username,
+            first_name: data.first_name,
+            last_name: data.last_name,
+            email: data.email,
+            mobile_number: data.mobile_number,
+            roles: data.roles as MeResponseDto["roles"],
         };
 
         return res.status(200).json({
