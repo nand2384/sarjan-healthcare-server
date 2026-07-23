@@ -9,7 +9,7 @@ export async function seedAuth() {
     const [adminRole, gender] = await Promise.all([
         prisma.roleMaster.findUniqueOrThrow({
             where: {
-                role_name: "admin",
+                role_name: "Admin",
             },
         }),
 

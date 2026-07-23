@@ -145,4 +145,140 @@ export class DoctorRepository {
             data,
         });
     }
+
+    public async getBasicDoctors(tx?: Prisma.TransactionClient) {
+        const prisma = tx ?? this.prisma;
+        return await prisma.staff.findMany({
+            where: {
+                deleted_at: null,
+                is_system_account: false,
+                is_disabled: false,
+                // is_account_activated: true,
+                staff_roles: {
+                    some: {
+                        role_id: 2,
+                    }
+                },
+            },
+            orderBy: {
+                created_at: "desc"
+            },
+            select: {
+                staff_id: true,
+                first_name: true,
+                last_name: true,
+                doctor_profile: {
+                    select: {
+                        specialization: true,
+                    }
+                }
+            },
+        });
+    }
+
+    public async getDoctorAvailability(staffId: number) {
+        return this.prisma.doctorAvailability.findMany({
+            where: {
+                doctor_staff_id: staffId,
+                deleted_at: null,
+            },
+            orderBy: [{
+                day_of_week: "asc",
+            },
+            {
+                start_time: "asc",
+            }],
+        });
+    }
+
+    public async createDoctorAvailability(staffId: number, slot: any) {
+        return this.prisma.doctorAvailability.create({
+            data: {
+                doctor_staff_id: staffId,
+                day_of_week: slot.day_of_week,
+                slot_name: slot.slot_name,
+                start_time: new Date(`1970-01-01T${slot.start_time}:00Z`), 
+                end_time: new Date(`1970-01-01T${slot.end_time}:00Z`),
+                maximum_appointments: slot.maximum_appointments,
+            }
+        });
+    }
+    
+    public async updateDoctorAvailability(slotId: number, slot: any) {
+        return this.prisma.doctorAvailability.update({
+            where: { doctor_availability_id: slotId },
+            data: {
+                day_of_week: slot.day_of_week,
+                slot_name: slot.slot_name,
+                start_time: new Date(`1970-01-01T${slot.start_time}:00Z`), 
+                end_time: new Date(`1970-01-01T${slot.end_time}:00Z`),
+                maximum_appointments: slot.maximum_appointments,
+            }
+        });
+    }
+    
+    public async softDeleteDoctorAvailability(slotId: number) {
+        return this.prisma.doctorAvailability.update({
+            where: { doctor_availability_id: slotId },
+            data: { deleted_at: new Date() }
+        });
+    }
+
+    public async getDoctorLeaves(staffId: number) {
+        return this.prisma.doctorLeave.findMany({
+            where: {
+                doctor_staff_id: staffId,
+            },
+            orderBy: {
+                start_date: "asc",
+            },
+        });
+    }
+
+    public async getDoctorLeavesInRange(staffId: number, startDate: string, endDate: string) {
+        return this.prisma.doctorLeave.findMany({
+            where: {
+                doctor_staff_id: staffId,
+                start_date: {
+                    lte: new Date(endDate),
+                },
+                end_date: {
+                    gte: new Date(startDate),
+                },
+            },
+            orderBy: {
+                start_date: "asc",
+            },
+        });
+    }
+
+    public async createDoctorLeave(staffId: number, leave: any) {
+        return this.prisma.doctorLeave.create({
+            data: {
+                doctor_staff_id: staffId,
+                start_date: new Date(leave.start_date),
+                end_date: new Date(leave.end_date),
+                reason: leave.reason,
+                doctor_availability_id: leave.doctor_availability_id,
+            }
+        });
+    }
+
+    public async updateDoctorLeave(leaveId: number, leave: any) {
+        return this.prisma.doctorLeave.update({
+            where: { doctor_leave_id: leaveId },
+            data: {
+                start_date: new Date(leave.start_date),
+                end_date: new Date(leave.end_date),
+                reason: leave.reason,
+                doctor_availability_id: leave.doctor_availability_id,
+            }
+        });
+    }
+
+    public async deleteDoctorLeave(leaveId: number) {
+        return this.prisma.doctorLeave.delete({
+            where: { doctor_leave_id: leaveId }
+        });
+    }
 }

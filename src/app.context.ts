@@ -17,6 +17,10 @@ import { DoctorRepository } from "@modules/doctor/doctor.repository";
 import { DoctorService } from "@modules/doctor/doctor.service";
 import { PasskeyRepository } from "@modules/passkey/passkey.repository";
 import { PasskeyService } from "@modules/passkey/passkey.service";
+import { PatientRepository } from "@modules/patient/patient.repository";
+import { PatientService } from "@modules/patient/patient.service";
+import { ReceptionistRepository } from "@modules/receptionist/receptionist.repository";
+import { ReceptionistService } from "@modules/receptionist/receptionist.service";
 
 const auditRepository = new AuditRepository(prisma);
 const auditService = new AuditService(auditRepository);
@@ -42,8 +46,14 @@ const staffService = new StaffService(prisma, staffRepository, staffRoleReposito
 const doctorRepository = new DoctorRepository(prisma);
 const doctorService = new DoctorService(prisma, doctorRepository, staffRepository, staffRoleRepository, auditService, mailerService);
 
+const patientRepository = new PatientRepository(prisma);
+const patientService = new PatientService(patientRepository);
+
 const passkeyRepository = new PasskeyRepository(prisma);
 const passkeyService = new PasskeyService(passkeyRepository, authRepository, sessionService);
+
+const receptionistRepository = new ReceptionistRepository(prisma);
+const receptionistService = new ReceptionistService(receptionistRepository);
 
 export const appContext = Object.freeze({
     logger,
@@ -58,7 +68,9 @@ export const appContext = Object.freeze({
         sessionService,
         staffService,
         doctorService,
+        patientService,
         mailerService,
         passkeyService,
+        receptionistService,
     },
 });

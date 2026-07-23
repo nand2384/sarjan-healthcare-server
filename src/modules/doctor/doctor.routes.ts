@@ -2,7 +2,7 @@ import { Router } from "express";
 import { appContext } from "../../app.context";
 import { DoctorController } from "./doctor.controller";
 import { validate } from "@middleware";
-import { createDoctorSchema, updateDoctorSchema } from "./doctor.schema";
+import { createDoctorSchema, updateDoctorSchema, doctorAvailabilitySlotSchema, doctorLeaveSchema } from "./doctor.schema";
 import { authMiddleware, roleMiddleware } from "@middleware";
 import { USER_ROLE } from "common/common.schema";
 
@@ -11,6 +11,13 @@ export const doctorRouter = Router();
 const doctorController = new DoctorController(appContext.services.doctorService);
 
 doctorRouter.get("/", doctorController.getAllDoctors);
+
+doctorRouter.get("/basic", 
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    doctorController.getBasicDoctors.bind(doctorController)
+);
+
 doctorRouter.get("/:id", doctorController.getDoctorById);
 
 doctorRouter.post(
@@ -27,4 +34,69 @@ doctorRouter.patch(
     roleMiddleware(USER_ROLE.ADMIN),
     validate(updateDoctorSchema),
     doctorController.updateDoctor.bind(doctorController)
+);
+
+doctorRouter.get(
+    "/:id/availability",
+    authMiddleware,
+    doctorController.getDoctorAvailability.bind(doctorController)
+);
+
+doctorRouter.get(
+    "/:id/effective-schedule",
+    authMiddleware,
+    doctorController.getEffectiveSchedule.bind(doctorController)
+);
+
+doctorRouter.post(
+    "/:id/availability",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    validate(doctorAvailabilitySlotSchema),
+    doctorController.createDoctorAvailability.bind(doctorController)
+);
+
+doctorRouter.put(
+    "/:id/availability/:slotId",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    validate(doctorAvailabilitySlotSchema),
+    doctorController.updateDoctorAvailability.bind(doctorController)
+);
+
+doctorRouter.delete(
+    "/:id/availability/:slotId",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    doctorController.deleteDoctorAvailability.bind(doctorController)
+);
+
+// Doctor Leave Management
+doctorRouter.get(
+    "/:id/leaves",
+    authMiddleware,
+    doctorController.getDoctorLeaves.bind(doctorController)
+);
+
+doctorRouter.post(
+    "/:id/leaves",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    validate(doctorLeaveSchema),
+    doctorController.createDoctorLeave.bind(doctorController)
+);
+
+doctorRouter.put(
+    "/:id/leaves/:leaveId",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    validate(doctorLeaveSchema),
+    doctorController.updateDoctorLeave.bind(doctorController)
+);
+
+doctorRouter.delete(
+    "/:id/leaves/:leaveId",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    doctorController.deleteDoctorLeave.bind(doctorController)
 );

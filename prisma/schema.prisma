@@ -119,7 +119,6 @@ model ValueMaster {
   patients Patient[]
 
   appointment_statuses          Appointment[]                @relation("AppointmentStatus")
-  visit_types                   Appointment[]                @relation("VisitType")
   visit_reasons                 Appointment[]                @relation("VisitReason")
   appointment_workflow_statuses AppointmentWorkflowHistory[] @relation("AppointmentWorkflowStatus")
 
@@ -228,7 +227,7 @@ model Patient {
   whatsapp_number String?
   email           String?
 
-  gender_id Int
+  gender_id Int?
 
   age Int?
 
@@ -237,13 +236,15 @@ model Patient {
   state          String?
   pincode        String?
 
+  is_account_complete Boolean @default(false)
+
   is_disabled Boolean @default(false)
 
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  gender          ValueMaster     @relation(fields: [gender_id], references: [value_id])
+  gender          ValueMaster?     @relation(fields: [gender_id], references: [value_id])
   patient_account PatientAccount? @relation(fields: [patient_account_id], references: [patient_account_id])
   appointments    Appointment[]   @relation("PatientAppointments")
 
@@ -402,6 +403,7 @@ model DoctorAvailability {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+  deleted_at DateTime?
 
   doctor        Staff         @relation("DoctorAvailability", fields: [doctor_staff_id], references: [staff_id])
   doctor_leaves DoctorLeave[]
@@ -445,11 +447,9 @@ model Appointment {
 
   doctor_staff_id Int
 
-  doctor_availability_id Int
+  doctor_availability_id Int?
 
   appointment_status_id Int
-
-  visit_type_id Int
 
   visit_reason_id Int
 
@@ -466,11 +466,9 @@ model Appointment {
 
   doctor Staff @relation("DoctorAppointments", fields: [doctor_staff_id], references: [staff_id])
 
-  doctor_availability DoctorAvailability @relation(fields: [doctor_availability_id], references: [doctor_availability_id])
+  doctor_availability DoctorAvailability? @relation(fields: [doctor_availability_id], references: [doctor_availability_id])
 
   appointment_status ValueMaster @relation("AppointmentStatus", fields: [appointment_status_id], references: [value_id])
-
-  visit_type ValueMaster @relation("VisitType", fields: [visit_type_id], references: [value_id])
 
   visit_reason ValueMaster @relation("VisitReason", fields: [visit_reason_id], references: [value_id])
 
@@ -484,7 +482,6 @@ model Appointment {
   @@index([doctor_staff_id])
   @@index([doctor_availability_id])
   @@index([appointment_status_id])
-  @@index([visit_type_id])
   @@index([visit_reason_id])
   @@index([created_by_staff_id])
   @@index([appointment_date])

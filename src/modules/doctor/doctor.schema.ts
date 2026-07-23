@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DayOfWeek } from "@generated/prisma/enums";
 
 const e164 = z.string().regex(/^\+?[1-9]\d{1,14}$/, "Invalid E.164 phone number format");
 
@@ -33,3 +34,28 @@ export const updateDoctorSchema = createDoctorSchema.partial().extend({
     is_disabled: z.boolean().optional()
 });
 export type UpdateDoctorDto = z.infer<typeof updateDoctorSchema>;
+
+export const doctorAvailabilitySlotSchema = z.object({
+    day_of_week: z.nativeEnum(DayOfWeek),
+    slot_name: z.string().trim().min(1, "Slot name is required"),
+    start_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format (HH:MM)"),
+    end_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format (HH:MM)"),
+    maximum_appointments: z.coerce.number().int().positive().default(1),
+});
+
+export type DoctorAvailabilitySlotDto = z.infer<typeof doctorAvailabilitySlotSchema>;
+
+export const updateDoctorAvailabilitySchema = z.array(doctorAvailabilitySlotSchema);
+export type UpdateDoctorAvailabilityDto = z.infer<typeof updateDoctorAvailabilitySchema>;
+
+export const doctorLeaveSchema = z.object({
+    start_date: z.string().datetime({ message: "Invalid ISO datetime for start_date" }),
+    end_date: z.string().datetime({ message: "Invalid ISO datetime for end_date" }),
+    reason: z.string().trim().optional(),
+    doctor_availability_id: z.number().int().positive().nullable().optional(),
+}).refine(data => new Date(data.end_date) >= new Date(data.start_date), {
+    message: "End date must be greater than or equal to start date",
+    path: ["end_date"],
+});
+
+export type DoctorLeaveDto = z.infer<typeof doctorLeaveSchema>;

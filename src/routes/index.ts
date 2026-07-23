@@ -6,6 +6,7 @@ import { healthRouter } from "@modules/health/health.routes";
 import { staffRouter } from "@modules/staff/staff.routes";
 import { masterRouter } from "@modules/master/master.routes";
 import { doctorRouter } from "@modules/doctor/doctor.routes";
+import { receptionistRouter } from "@modules/receptionist/receptionist.routes";
 
 // Remove on removing redis/clear API
 import { env } from "node:process";
@@ -13,6 +14,7 @@ import { AppError, ErrorCode } from "@errors";
 import { redisClient } from "@cache";
 import { appContext } from "app.context";
 import { passkeyRouter } from "@modules/passkey/passkey.routes";
+import { patientRouter } from "@modules/patient/patient.routes";
 
 const router = Router();
 
@@ -23,6 +25,8 @@ router.use("/auth", authRouter);
 router.use("/passkey", passkeyRouter);
 router.use("/staff", staffRouter);
 router.use("/doctors", doctorRouter);
+router.use("/patients", patientRouter);
+router.use("/receptionist", receptionistRouter);
 
 router.get("/dev/redis/clear", async (_req, res, next) => {
     try {
