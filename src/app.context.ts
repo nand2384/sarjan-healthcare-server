@@ -21,6 +21,8 @@ import { PatientRepository } from "@modules/patient/patient.repository";
 import { PatientService } from "@modules/patient/patient.service";
 import { ReceptionistRepository } from "@modules/receptionist/receptionist.repository";
 import { ReceptionistService } from "@modules/receptionist/receptionist.service";
+import { NotificationRepository } from "@modules/notification/notification.repository";
+import { NotificationService } from "@modules/notification/notification.service";
 
 const auditRepository = new AuditRepository(prisma);
 const auditService = new AuditService(auditRepository);
@@ -55,6 +57,9 @@ const passkeyService = new PasskeyService(passkeyRepository, authRepository, ses
 const receptionistRepository = new ReceptionistRepository(prisma);
 const receptionistService = new ReceptionistService(receptionistRepository);
 
+const notificationRepository = new NotificationRepository(prisma);
+const notificationService = new NotificationService(notificationRepository);
+
 export const appContext = Object.freeze({
     logger,
     prisma,
@@ -72,5 +77,8 @@ export const appContext = Object.freeze({
         mailerService,
         passkeyService,
         receptionistService,
+        notificationService,
     },
 });
+
+export type AppContext = typeof appContext;

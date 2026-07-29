@@ -4,6 +4,7 @@ const e164Regex = /^\+[1-9]\d{1,14}$/;
 
 export const registerAndBookSchema = z.object({
     first_name: z.string().trim().min(1, "First name is required"),
+    middle_name: z.string().trim().optional().or(z.literal('')),
     last_name: z.string().trim().min(1, "Last name is required"),
     mobile_number: z.string().regex(e164Regex, "Invalid mobile_number. Must be in E.164 format (e.g. +919876543210).").optional(),
     whatsapp_number: z.string().regex(e164Regex, "Invalid whatsapp_number. Must be in E.164 format (e.g. +919876543210).").optional(),
@@ -25,13 +26,15 @@ export const registerAndBookSchema = z.object({
 
 export const bookAppointmentSchema = z.object({
     doctor_staff_id: z.coerce.number().int().positive(),
-    doctor_availability_id: z.coerce.number().int().positive(),
-    appointment_date: z.string(),
-    visit_reason_id: z.coerce.number().int().positive()
+    doctor_availability_id: z.coerce.number().int().positive().optional().nullable(),
+    appointment_date: z.string().optional(),
+    visit_reason_id: z.coerce.number().int().positive(),
+    mode: z.enum(['call', 'walk-in']).optional().default('call')
 });
 
 export const registerWalkInSchema = z.object({
     first_name: z.string().trim().min(1, "First name is required"),
+    middle_name: z.string().trim().optional().or(z.literal('')),
     last_name: z.string().trim().min(1, "Last name is required"),
     mobile_number: z.string().regex(e164Regex, "Invalid mobile_number. Must be in E.164 format (e.g. +919876543210).").optional(),
     whatsapp_number: z.string().regex(e164Regex, "Invalid whatsapp_number. Must be in E.164 format (e.g. +919876543210).").optional(),
@@ -60,4 +63,11 @@ export const updateProfileSchema = z.object({
     city: z.string().trim().optional(),
     state: z.string().trim().optional(),
     pincode: z.string().regex(/^\d{6}$/, "Pincode must be exactly 6 digits").optional().or(z.literal('')),
+});
+
+export const searchDuplicatesSchema = z.object({
+    first_name: z.string().trim().optional(),
+    middle_name: z.string().trim().optional(),
+    last_name: z.string().trim().optional(),
+    mobile_number: z.string().trim().optional(),
 });

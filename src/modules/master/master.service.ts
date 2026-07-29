@@ -37,12 +37,19 @@ export class MasterService {
                 role_id: role.role_id,
                 role_name: role.role_name,
             })),
+            visitReasons: [],
         };
 
         for (const master of masters) {
             switch (master.master_name) {
                 case MasterNames.GENDER:
                     response.genders = master.values.map((value) => ({
+                        value_id: value.value_id,
+                        value_name: value.value_name,
+                    }));
+                    break;
+                case MasterNames.VISIT_REASON:
+                    response.visitReasons = master.values.map((value) => ({
                         value_id: value.value_id,
                         value_name: value.value_name,
                     }));

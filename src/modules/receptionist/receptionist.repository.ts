@@ -23,19 +23,30 @@ export class ReceptionistRepository {
                     select: {
                         appointment_id: true,
                         appointment_status_id: true,
+                        appointment_status: { select: { value_name: true } },
                         patient: {
                             select: {
                                 patient_id: true,
                                 first_name: true,
+                                middle_name: true,
                                 last_name: true,
                                 mobile_number: true,
                                 is_account_complete: true,
+                            }
+                        },
+                        visit_reason: { select: { value_name: true } },
+                        doctor_availability: {
+                            select: {
+                                start_time: true,
+                                end_time: true,
                             }
                         },
                         queue: {
                             select: {
                                 queue_number: true,
                                 queue_type: true,
+                                joined_queue_at: true,
+                                skip_count: true,
                             }
                         }
                     },
@@ -72,12 +83,12 @@ export class ReceptionistRepository {
         });
     }
 
-    public async getUpcomingAppointments(today: Date, tomorrow: Date, doctorId?: number) {
+    public async getUpcomingAppointments(today: Date, tomorrow?: Date, doctorId?: number) {
         const whereClause: any = {
-            appointment_date: { gte: today, lt: tomorrow },
+            appointment_date: tomorrow ? { gte: today, lt: tomorrow } : { gte: today },
             appointment_status_id: 4 // BOOKED
         };
-        
+
         if (doctorId) {
             whereClause.doctor_staff_id = doctorId;
         }
@@ -86,12 +97,14 @@ export class ReceptionistRepository {
             where: whereClause,
             select: {
                 appointment_id: true,
+                appointment_date: true,
                 doctor_staff_id: true,
                 appointment_status: { select: { value_name: true } },
                 patient: {
                     select: {
                         patient_id: true,
                         first_name: true,
+                        middle_name: true,
                         last_name: true,
                         mobile_number: true,
                         is_account_complete: true,
@@ -111,7 +124,10 @@ export class ReceptionistRepository {
                     }
                 }
             },
-            orderBy: { doctor_availability: { start_time: 'asc' } }
+            orderBy: [
+                { appointment_date: 'asc' },
+                { doctor_availability: { start_time: 'asc' } }
+            ]
         });
     }
 
@@ -131,10 +147,12 @@ export class ReceptionistRepository {
                     select: {
                         appointment_id: true,
                         appointment_status_id: true,
+                        appointment_status: { select: { value_name: true } },
                         patient: {
                             select: {
                                 patient_id: true,
                                 first_name: true,
+                                middle_name: true,
                                 last_name: true,
                                 mobile_number: true,
                                 is_account_complete: true,
@@ -144,7 +162,8 @@ export class ReceptionistRepository {
                             select: {
                                 queue_number: true,
                                 queue_type: true,
-                                created_at: true,
+                                joined_queue_at: true,
+                                skip_count: true,
                             }
                         },
                         visit_reason: { select: { value_name: true } },
@@ -242,6 +261,28 @@ export class ReceptionistRepository {
                 await tx.queue.update({
                     where: { queue_id: appointment.queue.queue_id },
                     data: { is_active: false }
+                });
+            }
+
+            // A BOOKED patient starting consultation counts as being "let ahead of"
+            // every walk-in still waiting for this doctor today — age them by one.
+            if (targetStatusId === 12 && appointment.queue?.queue_type === QueueType.BOOKED) {
+                const today = new Date();
+                today.setUTCHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+
+                await tx.queue.updateMany({
+                    where: {
+                        queue_type: QueueType.WALK_IN,
+                        is_active: true,
+                        appointment: {
+                            doctor_staff_id: appointment.doctor_staff_id,
+                            appointment_date: { gte: today, lt: tomorrow },
+                            appointment_status_id: 5 // CHECKED_IN, still waiting
+                        }
+                    },
+                    data: { skip_count: { increment: 1 } }
                 });
             }
 

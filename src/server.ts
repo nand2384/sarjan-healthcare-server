@@ -1,20 +1,46 @@
+import { createServer } from "http";
+
 import app from "./app";
-import { env } from "./config/env";
 import { appContext } from "./app.context";
-
+import { env } from "./config/env";
 import { connectDatabase } from "./database";
-import { shutdown } from "./shutdown";
 import { redisClient } from "@cache";
-
 import { startSessionCleanupJob } from "@scheduler";
+import { shutdown } from "./shutdown";
+import { setupWebSockets } from "./websocket";
+import { setHttpServer, setSocketServer, setWebSocketService } from "./server.instance";
 
-async function startServer() {
+import { Server as SocketIOServer } from "socket.io";
+import { WebSocketService } from "websocket/websocket.service";
+
+async function startServer(): Promise<void> {
     await connectDatabase();
     await redisClient.connect();
+
     startSessionCleanupJob();
 
-    app.listen(env.PORT, () => {
-        appContext.logger.info(`Server is running on port ${env.PORT}`);
+    const httpServer = createServer(app);
+
+    setHttpServer(httpServer);
+
+    const io = new SocketIOServer(httpServer, {
+        cors: {
+            origin: env.FRONTEND_URL,
+            credentials: true,
+        },
+    });
+    
+    const websocketService = new WebSocketService(io);
+    setWebSocketService(websocketService);
+
+    setSocketServer(io);
+
+    setupWebSockets(io, appContext);
+
+    httpServer.listen(env.PORT, () => {
+        appContext.logger.info(
+            `Server is running on port ${env.PORT}`,
+        );
     });
 }
 
@@ -26,4 +52,4 @@ process.on("SIGTERM", () => {
     void shutdown("SIGTERM");
 });
 
-startServer();
+void startServer();

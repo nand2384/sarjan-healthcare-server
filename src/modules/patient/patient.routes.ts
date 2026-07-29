@@ -17,6 +17,14 @@ patientRouter.get(
     patientController.searchPatients.bind(patientController)
 );
 
+// GET /patients/search-duplicates
+patientRouter.get(
+    "/search-duplicates",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.RECEPTIONIST, USER_ROLE.ADMIN),
+    patientController.searchDuplicates.bind(patientController)
+);
+
 // POST /patients/:id/appointments
 patientRouter.post(
     "/:id/appointments",

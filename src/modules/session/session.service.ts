@@ -4,7 +4,6 @@ import { env } from "@config";
 
 import { SessionRepository } from "./session.repository";
 import { RedisSessionData, StaffWithRoles } from "./session.types";
-import { AppError, ErrorCode } from "@errors";
 import { UAParser } from "ua-parser-js";
 import { logger } from "@logger";
 

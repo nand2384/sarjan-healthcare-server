@@ -3,11 +3,10 @@ import { Prisma, PrismaClient, Patient, Appointment, Queue } from "@generated/pr
 export class PatientRepository {
     constructor(private readonly prisma: PrismaClient) {}
 
-    public async getLastPatientByUhidPrefix(prefix: string, tx?: Prisma.TransactionClient) {
+    public async getUhidsByInitial(patientInitial: string, tx?: Prisma.TransactionClient): Promise<{ uhid: string }[]> {
         const prisma = tx ?? this.prisma;
-        return await prisma.patient.findFirst({
-            where: { uhid: { startsWith: prefix } },
-            orderBy: { uhid: 'desc' },
+        return await prisma.patient.findMany({
+            where: { uhid: { contains: `-${patientInitial}` } },
             select: { uhid: true },
         });
     }
@@ -95,6 +94,12 @@ export class PatientRepository {
                 }
             });
 
+            // Touch patient's updated_at timestamp so they appear at the top of active directory feeds
+            await tx.patient.update({
+                where: { patient_id: patientId },
+                data: { updated_at: new Date() }
+            });
+
             let queue = null;
             if (queueData) {
                 queue = await tx.queue.create({
@@ -131,17 +136,30 @@ export class PatientRepository {
     public async searchPatients(query: string, skip: number, take: number) {
         const searchTerms = query.split(' ').filter(t => t.trim().length > 0);
         
-        let where: Prisma.PatientWhereInput = { deleted_at: null };
+        const where: Prisma.PatientWhereInput = { deleted_at: null };
         
         if (searchTerms.length > 0) {
             where.OR = searchTerms.map(term => ({
                 OR: [
                     { first_name: { contains: term, mode: 'insensitive' } },
+                    { middle_name: { contains: term, mode: 'insensitive' } },
                     { last_name: { contains: term, mode: 'insensitive' } },
                     { mobile_number: { contains: term } },
                     { uhid: { contains: term, mode: 'insensitive' } }
                 ]
             }));
+        } else {
+            // General Patients List: explicitly do not show patients who currently hold an active or upcoming booked appointment
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            where.appointments = {
+                none: {
+                    appointment_date: { gte: today },
+                    appointment_status: {
+                        value_name: { notIn: ['CANCELLED', 'COMPLETED', 'DISCHARGED'] }
+                    }
+                }
+            };
         }
 
         const [patients, total] = await this.prisma.$transaction([
@@ -149,11 +167,68 @@ export class PatientRepository {
                 where,
                 skip,
                 take,
-                orderBy: { created_at: 'desc' }
+                include: {
+                    gender: { select: { value_name: true } },
+                    appointments: {
+                        include: {
+                            doctor: { select: { first_name: true, last_name: true } },
+                            doctor_availability: { select: { start_time: true, end_time: true } },
+                            visit_reason: { select: { value_name: true } },
+                            appointment_status: { select: { value_name: true } }
+                        },
+                        orderBy: { appointment_date: 'desc' },
+                        take: 10
+                    }
+                },
+                orderBy: { updated_at: 'desc' }
             }),
             this.prisma.patient.count({ where })
         ]);
 
         return { patients, total };
+    }
+
+    public async findDuplicatesByName(params: { first_name?: string; middle_name?: string; last_name?: string; mobile_number?: string }) {
+        const orConditions: Prisma.PatientWhereInput[] = [];
+
+        if (params.first_name && params.first_name.trim().length >= 2) {
+            orConditions.push({ first_name: { contains: params.first_name.trim(), mode: 'insensitive' } });
+        }
+        if (params.middle_name && params.middle_name.trim().length >= 2) {
+            orConditions.push({ middle_name: { contains: params.middle_name.trim(), mode: 'insensitive' } });
+        }
+        if (params.last_name && params.last_name.trim().length >= 2) {
+            orConditions.push({ last_name: { contains: params.last_name.trim(), mode: 'insensitive' } });
+        }
+        if (params.mobile_number && params.mobile_number.trim().length >= 5) {
+            orConditions.push({ mobile_number: { contains: params.mobile_number.trim() } });
+        }
+
+        if (orConditions.length === 0) {
+            return [];
+        }
+
+        return await this.prisma.patient.findMany({
+            where: {
+                deleted_at: null,
+                OR: orConditions
+            },
+            select: {
+                patient_id: true,
+                uhid: true,
+                first_name: true,
+                middle_name: true,
+                last_name: true,
+                mobile_number: true,
+                age: true,
+                gender: {
+                    select: {
+                        value_name: true
+                    }
+                }
+            },
+            take: 30,
+            orderBy: { created_at: 'desc' }
+        });
     }
 }

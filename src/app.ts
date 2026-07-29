@@ -27,6 +27,12 @@ app.use(cookieParser());
 app.use(rateLimiter);
 
 app.use("/api", router);
+app.get("/", (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "Keep Alive",
+    });
+});
 
 app.use(notFoundMiddleware);
 app.use(errorHandler);

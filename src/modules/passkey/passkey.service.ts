@@ -7,8 +7,6 @@ import {
     verifyRegistrationResponse,
     generateAuthenticationOptions,
     verifyAuthenticationResponse,
-    RegistrationResponseJSON,
-    AuthenticationResponseJSON,
 } from "@simplewebauthn/server";
 import { PasskeyDeviceType } from "@generated/prisma/client";
 import type { VerifyRegistrationRequestDto, VerifyAuthenticationRequestDto } from "./passkey.dto";

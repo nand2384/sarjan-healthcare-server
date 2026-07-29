@@ -355,8 +355,8 @@ export class DoctorService {
                         const max = s.maximum_appointments || 0;
                         const remaining = max - bookedCount;
 
-                        let ui_color = 'green';
-                        let ui_available_text = 'Available';
+                        let ui_color: string;
+                        let ui_available_text: string;
 
                         if (max === 0) {
                             ui_color = 'grey';

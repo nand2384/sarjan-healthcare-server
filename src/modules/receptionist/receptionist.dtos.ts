@@ -5,15 +5,18 @@ export type UpdateAppointmentStatusDto = z.infer<typeof updateAppointmentStatusS
 
 export interface AppointmentDto {
     appointment_id: number;
+    appointment_status_id?: number;
     doctor_staff_id?: number;
     date: string;
     status: string;
     ui_time_slot: string;
+    ui_dashboard_slot?: string;
     ui_is_arrived: boolean;
     ui_doctor_name: string | null;
     patient: {
         patient_id: number;
         first_name: string;
+        middle_name?: string | null;
         last_name: string;
         mobile_number: string;
         is_account_complete: boolean;
@@ -28,6 +31,7 @@ export interface AppointmentDto {
         queue_type: string;
         created_at: Date;
     };
+    is_priority: boolean;
 }
 
 export interface DoctorDto {
@@ -38,6 +42,7 @@ export interface DoctorDto {
     in_consultation: number;
     waiting: number;
     completed: number;
+    doctor_appointments?: AppointmentDto[];
 }
 
 export interface DashboardResponseDto {
@@ -49,7 +54,25 @@ export interface DashboardResponseDto {
     };
 }
 
+export interface PatientQueueDto {
+    id: string;
+    patientDbId: number;
+    name: string;
+    time: string;
+    type: 'advance' | 'walk-in';
+    status: string;
+    token?: string;
+    phone: string;
+    profileStatus: 'complete' | 'incomplete';
+    visitReason: string;
+    scheduledTime?: string;
+    isPriority: boolean;
+}
+
 export interface DoctorDashboardResponseDto {
     doctor: DoctorDto;
-    upcomingAppointments: AppointmentDto[];
+    currentlyConsulting: PatientQueueDto | null;
+    advanceBookingQueue: PatientQueueDto[];
+    walkInBookingQueue: PatientQueueDto[];
+    pendingAppointments: PatientQueueDto[];
 }

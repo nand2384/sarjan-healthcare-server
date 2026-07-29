@@ -1,4 +1,4 @@
-import { RegisterAndBookRequestDto, RegisterAndBookResponseDto } from "./patient.dtos";
+import { RegisterAndBookRequestDto, RegisterAndBookResponseDto, SearchDuplicatesRequestDto, SearchDuplicatesResponseDto } from "./patient.dtos";
 import { PatientRepository } from "./patient.repository";
 import { PatientMapper } from "./patient.mapper";
 import { QueueType } from "@generated/prisma/client";
@@ -7,21 +7,37 @@ import { AppError, ErrorCode } from "@errors";
 export class PatientService {
     constructor(private readonly patientRepository: PatientRepository) {}
 
-    private async generateUHID(): Promise<string> {
+    private async generateUHID(first_name: string, middle_name?: string | null, last_name?: string | null): Promise<string> {
         const now = new Date();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const year = String(now.getFullYear()).slice(-2);
         const prefix = `SHC-${month}${year}`;
 
-        const lastPatient = await this.patientRepository.getLastPatientByUhidPrefix(prefix);
-        let nextSequence = 1;
-        if (lastPatient && lastPatient.uhid) {
-            const parts = lastPatient.uhid.split('-');
-            if (parts.length === 3) {
-                nextSequence = parseInt(parts[2], 10) + 1;
+        const getInitial = (name?: string | null): string => {
+            if (!name) return '';
+            return name.trim().charAt(0).toUpperCase();
+        };
+
+        const patientInitial = (getInitial(first_name) + getInitial(middle_name) + getInitial(last_name)) || 'X';
+        const existingUhids = await this.patientRepository.getUhidsByInitial(patientInitial);
+        let maxSequence = 0;
+
+        for (const record of existingUhids) {
+            const parts = record.uhid.split('-');
+            if (parts.length >= 3) {
+                const lastPart = parts[parts.length - 1];
+                if (lastPart.startsWith(patientInitial)) {
+                    const numStr = lastPart.substring(patientInitial.length);
+                    const num = parseInt(numStr, 10);
+                    if (!isNaN(num) && num > maxSequence) {
+                        maxSequence = num;
+                    }
+                }
             }
         }
-        return `${prefix}-${String(nextSequence).padStart(4, '0')}`;
+
+        const nextSequence = maxSequence + 1;
+        return `${prefix}-${patientInitial}${nextSequence}`;
     }
 
     public async registerAndBook(data: RegisterAndBookRequestDto, createdByStaffId: number): Promise<RegisterAndBookResponseDto> {
@@ -30,15 +46,16 @@ export class PatientService {
             appointment_date, visit_reason_id, ...patientBaseData 
         } = data;
 
-        const uhid = await this.generateUHID();
+        const uhid = await this.generateUHID(data.first_name, data.middle_name, data.last_name);
         const patientData = { ...patientBaseData, uhid };
 
         const appointmentStatusId = mode === 'walk-in' ? 5 : 4;
+        const parsedAppointmentDate = new Date(appointment_date);
 
         const appointmentData = {
             doctor_staff_id,
             doctor_availability_id,
-            appointment_date: new Date(appointment_date),
+            appointment_date: parsedAppointmentDate,
             visit_reason_id,
             appointment_status_id: appointmentStatusId,
             created_by_staff_id: createdByStaffId,
@@ -55,6 +72,21 @@ export class PatientService {
                 joined_queue_at: today,
                 joined_after_consultation_sequence: 0,
             };
+        } else {
+            const today = new Date();
+            const isToday = parsedAppointmentDate.getFullYear() === today.getFullYear() &&
+                            parsedAppointmentDate.getMonth() === today.getMonth() &&
+                            parsedAppointmentDate.getDate() === today.getDate();
+
+            if (isToday) {
+                const queueNumber = await this.patientRepository.getNextQueueNumber(doctor_staff_id, parsedAppointmentDate);
+                queueData = {
+                    queue_number: queueNumber,
+                    queue_type: QueueType.BOOKED,
+                    joined_queue_at: parsedAppointmentDate,
+                    joined_after_consultation_sequence: 0,
+                };
+            }
         }
 
         // Execute Transaction
@@ -68,34 +100,81 @@ export class PatientService {
     }
 
     public async bookAppointment(patientId: number, data: any, createdByStaffId: number) {
-        const { doctor_staff_id, doctor_availability_id, appointment_date, visit_reason_id } = data;
+        const { doctor_staff_id, doctor_availability_id, appointment_date, visit_reason_id, mode = 'call' } = data;
 
-        const date = new Date(appointment_date);
+        let appointmentData: any;
+        let queueData: any = null;
 
-        const appointmentData = {
-            doctor_staff_id,
-            doctor_availability_id,
-            appointment_date: date,
-            visit_reason_id,
-            appointment_status_id: 2, // Booked
-            created_by_staff_id: createdByStaffId,
-        };
+        if (mode === 'walk-in') {
+            const walkInTime = new Date();
+            let selectedAvailabilityId = doctor_availability_id || null;
+            if (!selectedAvailabilityId) {
+                const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+                const dayOfWeekStr = days[walkInTime.getDay()];
+                const availabilities = await this.patientRepository.getDoctorAvailabilitiesByDay(doctor_staff_id, dayOfWeekStr);
+                const walkInMinutes = walkInTime.getHours() * 60 + walkInTime.getMinutes();
+                for (const shift of availabilities) {
+                    const startMinutes = shift.start_time.getUTCHours() * 60 + shift.start_time.getUTCMinutes();
+                    const endMinutes = shift.end_time.getUTCHours() * 60 + shift.end_time.getUTCMinutes();
+                    if (walkInMinutes >= startMinutes && walkInMinutes <= endMinutes) {
+                        selectedAvailabilityId = shift.doctor_availability_id;
+                        break;
+                    }
+                    if (walkInMinutes < startMinutes) {
+                        selectedAvailabilityId = shift.doctor_availability_id;
+                        break;
+                    }
+                    if (walkInMinutes > endMinutes && walkInMinutes <= endMinutes + 60) {
+                        selectedAvailabilityId = shift.doctor_availability_id;
+                    }
+                }
+            }
 
-        const today = new Date();
-        const isToday = date.getFullYear() === today.getFullYear() && 
-                        date.getMonth() === today.getMonth() && 
-                        date.getDate() === today.getDate();
+            appointmentData = {
+                doctor_staff_id,
+                doctor_availability_id: selectedAvailabilityId,
+                appointment_date: walkInTime,
+                visit_reason_id,
+                appointment_status_id: 5, // CHECKED_IN / Walk-in
+                created_by_staff_id: createdByStaffId,
+            };
 
-        let queueData = null;
-        if (isToday) {
-            const queueNumber = await this.patientRepository.getNextQueueNumber(doctor_staff_id, date);
+            const queueNumber = await this.patientRepository.getNextQueueNumber(doctor_staff_id, walkInTime);
             queueData = {
                 queue_number: queueNumber,
-                queue_type: QueueType.BOOKED,
-                joined_queue_at: date,
+                queue_type: QueueType.WALK_IN,
+                joined_queue_at: walkInTime,
                 joined_after_consultation_sequence: 0,
             };
-            appointmentData.appointment_status_id = 4; // Expected Today
+        } else {
+            if (!appointment_date || !doctor_availability_id) {
+                throw new AppError(400, ErrorCode.BAD_REQUEST, "appointment_date and doctor_availability_id are required for scheduled appointments");
+            }
+            const date = new Date(appointment_date);
+
+            appointmentData = {
+                doctor_staff_id,
+                doctor_availability_id,
+                appointment_date: date,
+                visit_reason_id,
+                appointment_status_id: 4, // BOOKED
+                created_by_staff_id: createdByStaffId,
+            };
+
+            const today = new Date();
+            const isToday = date.getFullYear() === today.getFullYear() && 
+                            date.getMonth() === today.getMonth() && 
+                            date.getDate() === today.getDate();
+
+            if (isToday) {
+                const queueNumber = await this.patientRepository.getNextQueueNumber(doctor_staff_id, date);
+                queueData = {
+                    queue_number: queueNumber,
+                    queue_type: QueueType.BOOKED,
+                    joined_queue_at: date,
+                    joined_after_consultation_sequence: 0,
+                };
+            }
         }
 
         const { appointment, queue } = await this.patientRepository.bookAppointmentTx(
@@ -118,8 +197,8 @@ export class PatientService {
 
     public async registerWalkIn(data: any, createdByStaffId: number): Promise<RegisterAndBookResponseDto> {
         const { 
-            mode, doctor_staff_id, current_time, 
-            visit_reason_id, doctor_availability_id, appointment_date,
+            mode: _mode, doctor_staff_id, current_time, 
+            visit_reason_id, doctor_availability_id: _doctor_availability_id, appointment_date: _appointment_date,
             ...patientBaseData 
         } = data;
 
@@ -160,7 +239,7 @@ export class PatientService {
             }
         }
 
-        const uhid = await this.generateUHID();
+        const uhid = await this.generateUHID(data.first_name, data.middle_name, data.last_name);
         const patientData = { ...patientBaseData, uhid };
 
         const appointmentData = {
@@ -201,5 +280,10 @@ export class PatientService {
 
         const { patients, total } = await this.patientRepository.searchPatients(query, skip, take);
         return PatientMapper.toPatientSearchResponse(patients, total, page, limit);
+    }
+
+    public async searchDuplicates(query: SearchDuplicatesRequestDto): Promise<SearchDuplicatesResponseDto> {
+        const records = await this.patientRepository.findDuplicatesByName(query);
+        return PatientMapper.toSearchDuplicatesResponse(records, query);
     }
 }

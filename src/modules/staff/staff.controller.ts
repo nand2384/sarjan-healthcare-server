@@ -108,8 +108,8 @@ export class StaffController {
         req: Request,
         res: Response,
     ):Promise<Response<{ success: boolean, message: string }>> => {
-        const staffIf = Number(req.params.id);
-        const staff = await this.staffService.deleteStaff(staffIf, req.auditContext);
+        const staffId = Number(req.params.id);
+        await this.staffService.deleteStaff(staffId, req.auditContext);
 
         return res.status(200).json({
             success: true,

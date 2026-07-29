@@ -112,4 +112,28 @@ export class PatientController {
             next(error);
         }
     }
+
+    public async searchDuplicates(req: Request, res: Response, next: NextFunction) {
+        try {
+            const first_name = req.query.first_name as string | undefined;
+            const middle_name = req.query.middle_name as string | undefined;
+            const last_name = req.query.last_name as string | undefined;
+            const mobile_number = req.query.mobile_number as string | undefined;
+
+            const response = await this.patientService.searchDuplicates({
+                first_name,
+                middle_name,
+                last_name,
+                mobile_number
+            });
+
+            res.status(200).json({
+                success: true,
+                message: "Duplicates search complete",
+                data: response
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 }

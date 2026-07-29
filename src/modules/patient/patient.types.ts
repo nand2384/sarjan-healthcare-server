@@ -1,3 +1,3 @@
 import { Prisma } from "@generated/prisma/client";
 
-export type PatientEntity = Prisma.PatientGetPayload<{}>;
+export type PatientEntity = Prisma.PatientGetPayload<Record<string, never>>;

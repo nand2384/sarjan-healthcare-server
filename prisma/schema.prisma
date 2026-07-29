@@ -186,6 +186,8 @@ model Staff {
 
   passkey_credentials PasskeyCredential[]
 
+  notifications Notification[]
+
   @@index([gender_id])
   @@index([username])
   @@index([email])
@@ -221,6 +223,7 @@ model Patient {
   uhid String @unique
 
   first_name String
+  middle_name String?
   last_name  String
 
   mobile_number   String?
@@ -541,4 +544,29 @@ model Queue {
   @@index([joined_queue_at])
   @@index([is_active])
   @@map("queue")
+}
+
+model Notification {
+  notification_id Int @id @default(autoincrement())
+  
+  staff_id Int
+  
+  title String
+  message String
+  
+  type String // e.g., 'INFO', 'WARNING', 'SUCCESS'
+  
+  is_read Boolean @default(false)
+  
+  // Optional link for frontend navigation
+  action_url String? 
+  
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  staff Staff @relation(fields: [staff_id], references: [staff_id])
+
+  @@index([staff_id])
+  @@index([is_read])
+  @@map("notification")
 }

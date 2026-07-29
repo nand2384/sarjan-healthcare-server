@@ -7,6 +7,10 @@ export default [
     ...tseslint.configs.recommended,
 
     {
+        ignores: ["dist/**"],
+    },
+
+    {
         files: ["**/*.ts"],
 
         languageOptions: {

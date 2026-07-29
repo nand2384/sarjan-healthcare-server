@@ -11,6 +11,7 @@ export interface RoleItemDto {
 export interface GetMastersResponseDto {
     genders: MasterItemDto[];
     roles: RoleItemDto[];
+    visitReasons: MasterItemDto[];
 }
 
 export interface CreateMainMasterDto {

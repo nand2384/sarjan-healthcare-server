@@ -25,7 +25,7 @@ export class PasskeyController {
         }
     }
 
-    public verifyRegistration = async (req: Request<{}, {}, VerifyRegistrationRequestDto>, res: Response, next: NextFunction) => {
+    public verifyRegistration = async (req: Request<Record<string, never>, Record<string, never>, VerifyRegistrationRequestDto>, res: Response, next: NextFunction) => {
         try {
             const staffId = (req as any).session.staff_id;
             const result = await this.passkeyService.verifyRegistration(staffId, req.body);
@@ -39,7 +39,7 @@ export class PasskeyController {
         }
     }
 
-    public generateAuthenticationOptions = async (req: Request<{}, {}, GenerateAuthenticationOptionsRequestDto>, res: Response, next: NextFunction) => {
+    public generateAuthenticationOptions = async (req: Request<Record<string, never>, Record<string, never>, GenerateAuthenticationOptionsRequestDto>, res: Response, next: NextFunction) => {
         try {
             const { identifier } = req.body;
             if (!identifier) {
@@ -59,7 +59,7 @@ export class PasskeyController {
         }
     }
 
-    public verifyAuthentication = async (req: Request<{}, {}, VerifyAuthenticationRequestDto>, res: Response, next: NextFunction) => {
+    public verifyAuthentication = async (req: Request<Record<string, never>, Record<string, never>, VerifyAuthenticationRequestDto>, res: Response, next: NextFunction) => {
         try {
             const { identifier, payload } = req.body;
             if (!identifier || !payload) {
@@ -111,7 +111,7 @@ export class PasskeyController {
         }
     }
 
-    public updatePasskeyName = async (req: Request<{ id: string }, {}, UpdatePasskeyNameRequestDto>, res: Response, next: NextFunction) => {
+    public updatePasskeyName = async (req: Request<{ id: string }, Record<string, never>, UpdatePasskeyNameRequestDto>, res: Response, next: NextFunction) => {
         try {
             const staffId = (req as any).session.staff_id;
             const { id } = req.params;
