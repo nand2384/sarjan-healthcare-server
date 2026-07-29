@@ -8,6 +8,7 @@ import { masterRouter } from "@modules/master/master.routes";
 import { doctorRouter } from "@modules/doctor/doctor.routes";
 import { receptionistRouter } from "@modules/receptionist/receptionist.routes";
 import { notificationRouter } from "@modules/notification/notification.routes";
+import { billingRouter } from "@modules/billing/billing.routes";
 
 // Remove on removing redis/clear API
 import { env } from "node:process";
@@ -29,6 +30,7 @@ router.use("/doctors", doctorRouter);
 router.use("/patients", patientRouter);
 router.use("/receptionist", receptionistRouter);
 router.use("/notifications", notificationRouter);
+router.use("/billing", billingRouter);
 
 router.get("/dev/redis/clear", async (_req, res, next) => {
     try {

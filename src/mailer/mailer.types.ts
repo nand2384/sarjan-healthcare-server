@@ -10,3 +10,8 @@ export interface SendStaffActivationMailOptions {
     username: string;
     activationLink: string;
 }
+
+export interface SendDoctorFeeMissingAlertOptions {
+    to: string;
+    doctorName: string;
+}

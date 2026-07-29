@@ -1,9 +1,18 @@
 import { AppError, ErrorCode } from "@errors";
 import { ReceptionistRepository } from "./receptionist.repository";
 import { ReceptionistMapper } from "./receptionist.mapper";
+import { BillingRepository } from "@modules/billing/billing.repository";
+import { BillingService } from "@modules/billing/billing.service";
+import { CheckoutPaymentMethod } from "@modules/billing/billing.dto";
+
+type AuditContext = { performed_by_staff_id: number; ip_address?: string; user_agent?: string };
 
 export class ReceptionistService {
-    constructor(private readonly receptionistRepository: ReceptionistRepository) {}
+    constructor(
+        private readonly receptionistRepository: ReceptionistRepository,
+        private readonly billingRepository: BillingRepository,
+        private readonly billingService: BillingService,
+    ) {}
 
     public async getDashboardData() {
         const today = new Date();
@@ -71,6 +80,24 @@ export class ReceptionistService {
         if (!targetStatusId) throw new AppError(400, ErrorCode.BAD_REQUEST, "Invalid status");
 
         return this.receptionistRepository.updateAppointmentStatusTx(appointmentId, targetStatusId, statusName, staffId);
+    }
+
+    public async sendForTests(appointmentId: number, testCatalogIds: number[], staffId: number) {
+        return this.billingRepository.sendForTestsTx(appointmentId, testCatalogIds, staffId);
+    }
+
+    public async getCheckoutInfo(appointmentId: number) {
+        return this.billingService.getCheckoutInfo(appointmentId);
+    }
+
+    public async checkout(
+        appointmentId: number,
+        staffId: number,
+        additionalTestCatalogIds: number[],
+        paymentMethod: CheckoutPaymentMethod,
+        auditContext: AuditContext,
+    ) {
+        return this.billingService.checkout(appointmentId, staffId, additionalTestCatalogIds, paymentMethod, auditContext);
     }
 
 }

@@ -61,6 +61,18 @@ enum PasskeyDeviceType {
   MULTI_DEVICE
 }
 
+enum PaymentMethod {
+  CASH
+  CARD
+  UPI
+  ONLINE_GATEWAY // reserved for future gateway integration, unused for now
+}
+
+enum LineItemType {
+  CONSULTATION
+  TEST
+}
+
 model RoleMaster {
   role_id Int @id @default(autoincrement())
 
@@ -164,8 +176,8 @@ model Staff {
   activation_token            String?   @unique
   activation_token_expires_at DateTime?
 
-  current_challenge      String?
-  challenge_created_at   DateTime?
+  current_challenge    String?
+  challenge_created_at DateTime?
 
   gender ValueMaster @relation(fields: [gender_id], references: [value_id])
 
@@ -187,6 +199,11 @@ model Staff {
   passkey_credentials PasskeyCredential[]
 
   notifications Notification[]
+
+  test_orders_placed TestOrder[] @relation("TestOrderedBy")
+
+  payments_collected Payment[] @relation("PaymentCollectedBy")
+  payments_refunded  Payment[] @relation("PaymentRefundedBy")
 
   @@index([gender_id])
   @@index([username])
@@ -222,9 +239,9 @@ model Patient {
 
   uhid String @unique
 
-  first_name String
+  first_name  String
   middle_name String?
-  last_name  String
+  last_name   String
 
   mobile_number   String?
   whatsapp_number String?
@@ -247,9 +264,12 @@ model Patient {
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
-  gender          ValueMaster?     @relation(fields: [gender_id], references: [value_id])
+  gender          ValueMaster?    @relation(fields: [gender_id], references: [value_id])
   patient_account PatientAccount? @relation(fields: [patient_account_id], references: [patient_account_id])
   appointments    Appointment[]   @relation("PatientAppointments")
+
+  test_orders TestOrder[]
+  payments    Payment[]
 
   @@index([gender_id])
   @@index([patient_account_id])
@@ -297,6 +317,11 @@ model DoctorProfile {
 
   is_visible_on_website     Boolean @default(true)
   is_accepting_appointments Boolean @default(true)
+
+  // Placeholder 0 on backfill for existing doctors — treated as "unset" by the billing module,
+  // which blocks checkout and alerts admin until a real value is set via the pricing admin UI.
+  old_case_fee Decimal @default(0) @db.Decimal(10, 2)
+  new_case_fee Decimal @default(0) @db.Decimal(10, 2)
 
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
@@ -359,32 +384,31 @@ model AuditLog {
 }
 
 model PasskeyCredential {
-  id               String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  staff_id         Int
+  staff_id Int
 
-  credential_id    String   @unique
-  public_key       Bytes
+  credential_id String @unique
+  public_key    Bytes
 
-  counter          BigInt
+  counter BigInt
 
-  transports       String[]
+  transports String[]
 
-  device_type      PasskeyDeviceType
+  device_type PasskeyDeviceType
 
-  backed_up        Boolean
+  backed_up Boolean
 
-  device_name    String?
+  device_name String?
 
-  last_used_at     DateTime?
+  last_used_at DateTime?
 
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   staff Staff @relation(fields: [staff_id], references: [staff_id], onDelete: Cascade)
 
   @@index([staff_id])
-
   @@map("passkey_credential")
 }
 
@@ -404,8 +428,8 @@ model DoctorAvailability {
 
   display_order Int @default(0)
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
   doctor        Staff         @relation("DoctorAvailability", fields: [doctor_staff_id], references: [staff_id])
@@ -481,6 +505,9 @@ model Appointment {
 
   queue Queue?
 
+  test_orders TestOrder[]
+  payment     Payment?
+
   @@index([patient_id])
   @@index([doctor_staff_id])
   @@index([doctor_availability_id])
@@ -546,21 +573,129 @@ model Queue {
   @@map("queue")
 }
 
+model TestCatalog {
+  test_catalog_id Int @id @default(autoincrement())
+
+  test_name String
+  price     Decimal @db.Decimal(10, 2)
+
+  display_order Int     @default(0)
+  is_active     Boolean @default(true)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  test_orders        TestOrder[]
+  payment_line_items PaymentLineItem[]
+
+  @@index([is_active])
+  @@map("test_catalog")
+}
+
+model TestOrder {
+  test_order_id Int @id @default(autoincrement())
+
+  patient_id Int
+
+  // Nullable: null when a patient walks in for a test only, with no doctor appointment.
+  appointment_id Int?
+
+  test_catalog_id Int
+
+  // Receptionist (walk-in test-only order) or doctor (ordered during a consultation).
+  ordered_by_staff_id Int
+
+  ordered_at DateTime @default(now())
+
+  patient          Patient      @relation(fields: [patient_id], references: [patient_id])
+  appointment      Appointment? @relation(fields: [appointment_id], references: [appointment_id])
+  test_catalog     TestCatalog  @relation(fields: [test_catalog_id], references: [test_catalog_id])
+  ordered_by_staff Staff        @relation("TestOrderedBy", fields: [ordered_by_staff_id], references: [staff_id])
+
+  payment_line_items PaymentLineItem[]
+
+  @@index([patient_id])
+  @@index([appointment_id])
+  @@index([test_catalog_id])
+  @@map("test_order")
+}
+
+model Payment {
+  payment_id Int @id @default(autoincrement())
+
+  patient_id Int
+
+  // Nullable: null for a test-only checkout with no doctor appointment.
+  appointment_id Int? @unique
+
+  receipt_no String @unique // backend-generated, e.g. REC-20260730-0001; never entered manually
+
+  // 'NEW' | 'OLD' snapshot at payment time, for audit/reprint accuracy. Null when the payment has
+  // no consultation line item (test-only checkout).
+  consultation_fee_type String?
+
+  total_amount   Decimal       @db.Decimal(10, 2)
+  payment_method PaymentMethod
+
+  gateway_provider       String? // reserved for future
+  gateway_transaction_id String? // reserved for future
+
+  refund_amount        Decimal?  @db.Decimal(10, 2)
+  refund_reason        String?
+  refunded_by_staff_id Int?
+  refunded_at          DateTime?
+
+  collected_by_staff_id Int
+  paid_at               DateTime @default(now())
+
+  patient            Patient      @relation(fields: [patient_id], references: [patient_id])
+  appointment        Appointment? @relation(fields: [appointment_id], references: [appointment_id])
+  collected_by_staff Staff        @relation("PaymentCollectedBy", fields: [collected_by_staff_id], references: [staff_id])
+  refunded_by_staff  Staff?       @relation("PaymentRefundedBy", fields: [refunded_by_staff_id], references: [staff_id])
+
+  line_items PaymentLineItem[]
+
+  @@index([patient_id])
+  @@map("payment")
+}
+
+model PaymentLineItem {
+  payment_line_item_id Int @id @default(autoincrement())
+
+  payment_id Int
+
+  item_type   LineItemType
+  description String // snapshot label for receipt printing
+  amount      Decimal      @db.Decimal(10, 2)
+
+  // Set only when item_type = TEST, for traceability back to the catalog and the specific order billed.
+  test_catalog_id Int?
+  test_order_id   Int?
+
+  payment      Payment      @relation(fields: [payment_id], references: [payment_id])
+  test_catalog TestCatalog? @relation(fields: [test_catalog_id], references: [test_catalog_id])
+  test_order   TestOrder?   @relation(fields: [test_order_id], references: [test_order_id])
+
+  @@index([payment_id])
+  @@map("payment_line_item")
+}
+
 model Notification {
   notification_id Int @id @default(autoincrement())
-  
+
   staff_id Int
-  
-  title String
+
+  title   String
   message String
-  
+
   type String // e.g., 'INFO', 'WARNING', 'SUCCESS'
-  
+
   is_read Boolean @default(false)
-  
+
   // Optional link for frontend navigation
-  action_url String? 
-  
+  action_url String?
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 

@@ -32,6 +32,7 @@ export interface AppointmentDto {
         created_at: Date;
     };
     is_priority: boolean;
+    status_started_at?: string; // ISO timestamp when the current appointment_status began - for live timer
 }
 
 export interface DoctorDto {
@@ -67,6 +68,8 @@ export interface PatientQueueDto {
     visitReason: string;
     scheduledTime?: string;
     isPriority: boolean;
+    joined_at?: string; // ISO timestamp (GMT) when patient joined queue - for live timer
+    status_started_at?: string; // ISO timestamp (GMT) when the current status began - for live timer
 }
 
 export interface DoctorDashboardResponseDto {

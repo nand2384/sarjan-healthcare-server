@@ -48,6 +48,11 @@ export class ReceptionistRepository {
                                 joined_queue_at: true,
                                 skip_count: true,
                             }
+                        },
+                        appointment_workflow_history: {
+                            select: { created_at: true },
+                            orderBy: { created_at: 'desc' },
+                            take: 1
                         }
                     },
                     orderBy: { queue: { joined_queue_at: 'asc' } }
@@ -165,6 +170,11 @@ export class ReceptionistRepository {
                                 joined_queue_at: true,
                                 skip_count: true,
                             }
+                        },
+                        appointment_workflow_history: {
+                            select: { created_at: true },
+                            orderBy: { created_at: 'desc' },
+                            take: 1
                         },
                         visit_reason: { select: { value_name: true } },
                         doctor_availability: {

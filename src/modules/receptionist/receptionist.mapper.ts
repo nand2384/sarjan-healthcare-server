@@ -19,6 +19,20 @@ export class ReceptionistMapper {
         return `${formattedHours}:${minutes} ${ampm}`;
     }
 
+    // Format a GMT/UTC date to IST (Indian Standard Time, UTC+5:30) in 12-hour format
+    private static formatTimeGMTtoIST(gmtDate: string | Date | null): string {
+        if (!gmtDate) return '';
+        const date = typeof gmtDate === 'string' ? new Date(gmtDate) : gmtDate;
+        // IST is UTC+5:30, so add 5.5 hours (330 minutes)
+        const istDate = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+        const timeString = istDate.toISOString().substring(11, 16);
+        const [hoursStr, minutes] = timeString.split(':');
+        const hours = parseInt(hoursStr, 10);
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const formattedHours = hours % 12 || 12;
+        return `${formattedHours}:${minutes} ${ampm}`;
+    }
+
     public static toAppointmentDto(appt: any): AppointmentDto {
         const rawStatus = appt.appointment_status?.value_name || 'BOOKED';
         const statusName = rawStatus.toUpperCase().replace(/ /g, '_');
@@ -71,6 +85,9 @@ export class ReceptionistMapper {
                 created_at: appt.queue.joined_queue_at,
             } : undefined,
             is_priority: isPromotedWalkIn(appt),
+            status_started_at: appt.appointment_workflow_history?.[0]?.created_at
+                ? new Date(appt.appointment_workflow_history[0].created_at).toISOString()
+                : undefined,
         };
     }
 
@@ -117,7 +134,7 @@ export class ReceptionistMapper {
             id: appt.appointment_id.toString(),
             patientDbId: appt.patient.patient_id,
             name: `${appt.patient.first_name} ${appt.patient.middle_name ? appt.patient.middle_name + ' ' : ''}${appt.patient.last_name}`,
-            time: appt.queue_info ? new Date(appt.queue_info.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            time: appt.queue_info ? this.formatTimeGMTtoIST(appt.queue_info.created_at) : 'N/A',
             type: appt.queue_info?.queue_type === 'WALK_IN' ? 'walk-in' : 'advance',
             status: this.getStatusStr(appt.appointment_status_id || 0),
             token: appt.queue_info?.queue_number?.toString() || undefined,
@@ -126,6 +143,8 @@ export class ReceptionistMapper {
             visitReason: appt.visit_reason || 'Checkup',
             scheduledTime: appt.ui_time_slot !== 'Walk-in' ? appt.ui_time_slot : undefined,
             isPriority: appt.is_priority || false,
+            joined_at: appt.queue_info?.created_at ? new Date(appt.queue_info.created_at).toISOString() : undefined,
+            status_started_at: appt.status_started_at,
         };
     }
 

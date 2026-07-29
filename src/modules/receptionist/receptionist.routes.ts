@@ -3,7 +3,8 @@ import { ReceptionistController } from "./receptionist.controller";
 import { authMiddleware, roleMiddleware, validate } from "@middleware";
 import { appContext } from "../../app.context";
 import { USER_ROLE } from "../../common/common.schema";
-import { updateAppointmentStatusSchema } from "./receptionist.schema";
+import { updateAppointmentStatusSchema, sendForTestsSchema } from "./receptionist.schema";
+import { checkoutSchema } from "@modules/billing/billing.schema";
 
 export const receptionistRouter = Router();
 
@@ -39,9 +40,32 @@ receptionistRouter.patch(
 );
 
 receptionistRouter.patch(
-    "/appointments/:id/status", 
+    "/appointments/:id/status",
     authMiddleware,
     roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
     validate(updateAppointmentStatusSchema),
     receptionistController.updateAppointmentStatus.bind(receptionistController)
+);
+
+receptionistRouter.post(
+    "/appointments/:id/send-for-tests",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    validate(sendForTestsSchema),
+    receptionistController.sendForTests.bind(receptionistController)
+);
+
+receptionistRouter.get(
+    "/appointments/:id/checkout-info",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    receptionistController.getCheckoutInfo.bind(receptionistController)
+);
+
+receptionistRouter.post(
+    "/appointments/:id/checkout",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    validate(checkoutSchema),
+    receptionistController.checkout.bind(receptionistController)
 );

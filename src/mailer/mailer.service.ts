@@ -1,8 +1,8 @@
 import { env } from "@config";
 
 import { mailTransporter } from "./mailer.provider";
-import { staffActivationTemplate } from "./mailer.templates";
-import { SendMailOptions, SendStaffActivationMailOptions } from "./mailer.types";
+import { staffActivationTemplate, doctorFeeMissingTemplate } from "./mailer.templates";
+import { SendMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions } from "./mailer.types";
 
 export class MailerService {
     async send({ to, subject, html }: SendMailOptions): Promise<void> {
@@ -28,6 +28,14 @@ export class MailerService {
                 username,
                 activationLink,
             }),
+        });
+    }
+
+    async sendDoctorFeeMissingAlert({ to, doctorName }: SendDoctorFeeMissingAlertOptions): Promise<void> {
+        await this.send({
+            to,
+            subject: "Action required: Doctor consultation fees not configured",
+            html: doctorFeeMissingTemplate({ doctorName }),
         });
     }
 }

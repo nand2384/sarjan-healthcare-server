@@ -119,6 +119,24 @@ interface StaffActivationTemplateOptions {
     activationLink: string;
 }
 
+interface DoctorFeeMissingTemplateOptions {
+    doctorName: string;
+}
+
+export function doctorFeeMissingTemplate({ doctorName }: DoctorFeeMissingTemplateOptions): string {
+    return emailLayout({
+        title: "Action required: Doctor consultation fees not configured",
+        heading: "Checkout blocked — fees not configured",
+        content: `
+<p style="margin-top: 0; margin-bottom: 16px;">A receptionist just attempted to check out a patient for <strong style="color: #0F172A;">Dr. ${doctorName}</strong>, but the doctor's consultation fees (old-case / new-case) are not yet configured.</p>
+
+<p style="margin-top: 0; margin-bottom: 16px;">Checkout for this doctor's patients will remain blocked until both fees are set.</p>
+
+<p style="margin-top: 0; margin-bottom: 0; font-size: 14px;">Please set these fees as soon as possible from the admin Pricing Management page.</p>
+`,
+    });
+}
+
 export function staffActivationTemplate({
     firstName,
     username,

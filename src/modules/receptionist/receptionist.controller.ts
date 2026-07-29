@@ -87,4 +87,66 @@ export class ReceptionistController {
             data
         });
     }
+
+    public async sendForTests(req: Request, res: Response) {
+        const appointmentId = parseInt(req.params.id as string);
+        if (isNaN(appointmentId)) {
+            throw new AppError(400, ErrorCode.BAD_REQUEST, "Invalid appointment ID");
+        }
+
+        const { test_catalog_ids } = req.body;
+
+        const staffId = req.session?.staff_id;
+        if (!staffId) {
+            throw new AppError(401, ErrorCode.UNAUTHORIZED, "User not authenticated");
+        }
+
+        const data = await this.receptionistService.sendForTests(appointmentId, test_catalog_ids, staffId);
+        return res.status(200).json({
+            success: true,
+            message: "Patient sent for tests successfully",
+            data
+        });
+    }
+
+    public async getCheckoutInfo(req: Request, res: Response) {
+        const appointmentId = parseInt(req.params.id as string);
+        if (isNaN(appointmentId)) {
+            throw new AppError(400, ErrorCode.BAD_REQUEST, "Invalid appointment ID");
+        }
+
+        const data = await this.receptionistService.getCheckoutInfo(appointmentId);
+        return res.status(200).json({
+            success: true,
+            message: "Fetched checkout info successfully",
+            data
+        });
+    }
+
+    public async checkout(req: Request, res: Response) {
+        const appointmentId = parseInt(req.params.id as string);
+        if (isNaN(appointmentId)) {
+            throw new AppError(400, ErrorCode.BAD_REQUEST, "Invalid appointment ID");
+        }
+
+        const { additional_test_catalog_ids, payment_method } = req.body;
+
+        const staffId = req.session?.staff_id;
+        if (!staffId) {
+            throw new AppError(401, ErrorCode.UNAUTHORIZED, "User not authenticated");
+        }
+
+        const data = await this.receptionistService.checkout(
+            appointmentId,
+            staffId,
+            additional_test_catalog_ids,
+            payment_method,
+            req.auditContext,
+        );
+        return res.status(200).json({
+            success: true,
+            message: "Checkout completed successfully",
+            data
+        });
+    }
 }

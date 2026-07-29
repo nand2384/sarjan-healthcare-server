@@ -23,6 +23,8 @@ import { ReceptionistRepository } from "@modules/receptionist/receptionist.repos
 import { ReceptionistService } from "@modules/receptionist/receptionist.service";
 import { NotificationRepository } from "@modules/notification/notification.repository";
 import { NotificationService } from "@modules/notification/notification.service";
+import { BillingRepository } from "@modules/billing/billing.repository";
+import { BillingService } from "@modules/billing/billing.service";
 
 const auditRepository = new AuditRepository(prisma);
 const auditService = new AuditService(auditRepository);
@@ -54,8 +56,11 @@ const patientService = new PatientService(patientRepository);
 const passkeyRepository = new PasskeyRepository(prisma);
 const passkeyService = new PasskeyService(passkeyRepository, authRepository, sessionService);
 
+const billingRepository = new BillingRepository(prisma);
+const billingService = new BillingService(billingRepository, auditService, mailerService);
+
 const receptionistRepository = new ReceptionistRepository(prisma);
-const receptionistService = new ReceptionistService(receptionistRepository);
+const receptionistService = new ReceptionistService(receptionistRepository, billingRepository, billingService);
 
 const notificationRepository = new NotificationRepository(prisma);
 const notificationService = new NotificationService(notificationRepository);
@@ -78,6 +83,7 @@ export const appContext = Object.freeze({
         passkeyService,
         receptionistService,
         notificationService,
+        billingService,
     },
 });
 
