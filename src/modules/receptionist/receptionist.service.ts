@@ -1,5 +1,5 @@
 import { AppError, ErrorCode } from "@errors";
-import { ReceptionistRepository } from "./receptionist.repository";
+import { ReceptionistRepository, AppointmentHistoryFilters } from "./receptionist.repository";
 import { ReceptionistMapper } from "./receptionist.mapper";
 import { BillingRepository } from "@modules/billing/billing.repository";
 import { BillingService } from "@modules/billing/billing.service";
@@ -98,6 +98,24 @@ export class ReceptionistService {
         auditContext: AuditContext,
     ) {
         return this.billingService.checkout(appointmentId, staffId, additionalTestCatalogIds, paymentMethod, auditContext);
+    }
+
+    public async getAppointmentHistory(filters: AppointmentHistoryFilters) {
+        const { rows, total } = await this.receptionistRepository.getAppointmentHistory(filters);
+        return {
+            rows: rows.map((row: any) => ReceptionistMapper.toAppointmentHistoryItemDto(row)),
+            total,
+            page: filters.page,
+            limit: filters.limit,
+        };
+    }
+
+    public async getAppointmentHistorySummary(startDate: Date, endDate: Date) {
+        return this.receptionistRepository.getAppointmentHistorySummary(startDate, endDate);
+    }
+
+    public async getReceipt(appointmentId: number) {
+        return this.billingService.getReceipt(appointmentId);
     }
 
 }

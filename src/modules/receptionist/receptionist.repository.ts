@@ -1,6 +1,17 @@
 import { PrismaClient, QueueType } from "@generated/prisma/client";
 import { AppError, ErrorCode } from "@errors";
 
+export interface AppointmentHistoryFilters {
+    startDate: Date;
+    endDate: Date;
+    doctorId?: number;
+    queueType?: 'BOOKED' | 'WALK_IN';
+    status?: 'completed' | 'walked-out' | 'cancelled';
+    search?: string;
+    page: number;
+    limit: number;
+}
+
 export class ReceptionistRepository {
     constructor(private readonly prisma: PrismaClient) {}
 
@@ -317,5 +328,77 @@ export class ReceptionistRepository {
             totalAppointments,
             remainingAppointments
         };
+    }
+
+    // --- Appointment History (Phase 6) ---
+
+    public async getAppointmentHistory(filters: AppointmentHistoryFilters) {
+        const statusIdMap: Record<string, number> = { completed: 6, 'walked-out': 15, cancelled: 7 };
+
+        const where: any = {
+            appointment_date: { gte: filters.startDate, lte: filters.endDate },
+            appointment_status_id: filters.status ? statusIdMap[filters.status] : { in: [6, 15, 7] },
+        };
+
+        if (filters.doctorId) where.doctor_staff_id = filters.doctorId;
+        if (filters.queueType) where.queue = { queue_type: filters.queueType };
+        if (filters.search) {
+            where.patient = {
+                OR: [
+                    { first_name: { contains: filters.search, mode: 'insensitive' } },
+                    { last_name: { contains: filters.search, mode: 'insensitive' } },
+                    { mobile_number: { contains: filters.search } },
+                ]
+            };
+        }
+
+        const [rows, total] = await Promise.all([
+            this.prisma.appointment.findMany({
+                where,
+                orderBy: { appointment_date: 'desc' },
+                skip: (filters.page - 1) * filters.limit,
+                take: filters.limit,
+                select: {
+                    appointment_id: true,
+                    appointment_date: true,
+                    appointment_status_id: true,
+                    patient: {
+                        select: { patient_id: true, first_name: true, middle_name: true, last_name: true, mobile_number: true }
+                    },
+                    doctor: { select: { first_name: true, last_name: true } },
+                    queue: { select: { queue_type: true } },
+                    payment: {
+                        select: { total_amount: true, payment_method: true, receipt_no: true, consultation_fee_type: true }
+                    },
+                    test_orders: { select: { test_order_id: true } },
+                }
+            }),
+            this.prisma.appointment.count({ where })
+        ]);
+
+        return { rows, total };
+    }
+
+    public async getAppointmentHistorySummary(startDate: Date, endDate: Date) {
+        const where = {
+            appointment_date: { gte: startDate, lte: endDate },
+            appointment_status_id: { in: [6, 15, 7] }, // COMPLETED, WALKED_OUT, CANCELLED
+        };
+
+        const [totalVisits, walkInCount, bookedCount, payments] = await Promise.all([
+            this.prisma.appointment.count({ where }),
+            this.prisma.appointment.count({ where: { ...where, queue: { queue_type: QueueType.WALK_IN } } }),
+            this.prisma.appointment.count({ where: { ...where, queue: { queue_type: QueueType.BOOKED } } }),
+            this.prisma.payment.findMany({
+                where: { paid_at: { gte: startDate, lte: endDate } },
+                select: { total_amount: true, consultation_fee_type: true }
+            })
+        ]);
+
+        const totalCollected = payments.reduce((sum, p) => sum + Number(p.total_amount), 0);
+        const newPatientCount = payments.filter(p => p.consultation_fee_type === 'NEW').length;
+        const returningPatientCount = payments.filter(p => p.consultation_fee_type === 'OLD').length;
+
+        return { totalVisits, walkInCount, bookedCount, totalCollected, newPatientCount, returningPatientCount };
     }
 }

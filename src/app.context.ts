@@ -25,6 +25,8 @@ import { NotificationRepository } from "@modules/notification/notification.repos
 import { NotificationService } from "@modules/notification/notification.service";
 import { BillingRepository } from "@modules/billing/billing.repository";
 import { BillingService } from "@modules/billing/billing.service";
+import { FinanceRepository } from "@modules/finance/finance.repository";
+import { FinanceService } from "@modules/finance/finance.service";
 
 const auditRepository = new AuditRepository(prisma);
 const auditService = new AuditService(auditRepository);
@@ -65,6 +67,9 @@ const receptionistService = new ReceptionistService(receptionistRepository, bill
 const notificationRepository = new NotificationRepository(prisma);
 const notificationService = new NotificationService(notificationRepository);
 
+const financeRepository = new FinanceRepository(prisma);
+const financeService = new FinanceService(financeRepository);
+
 export const appContext = Object.freeze({
     logger,
     prisma,
@@ -84,6 +89,7 @@ export const appContext = Object.freeze({
         receptionistService,
         notificationService,
         billingService,
+        financeService,
     },
 });
 

@@ -79,3 +79,35 @@ export interface DoctorDashboardResponseDto {
     walkInBookingQueue: PatientQueueDto[];
     pendingAppointments: PatientQueueDto[];
 }
+
+export interface AppointmentHistoryItemDto {
+    appointment_id: number;
+    date: string;
+    status: 'completed' | 'walked-out' | 'cancelled';
+    patient_name: string;
+    mobile_number: string;
+    doctor_name: string;
+    queue_type: 'walk-in' | 'booked' | null;
+    payment_status: 'paid' | 'none';
+    total_amount?: string;
+    payment_method?: string;
+    receipt_no?: string;
+    patient_type?: 'NEW' | 'OLD';
+    tests_ordered_count: number;
+}
+
+export interface AppointmentHistoryResponseDto {
+    rows: AppointmentHistoryItemDto[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
+export interface AppointmentHistorySummaryDto {
+    totalVisits: number;
+    walkInCount: number;
+    bookedCount: number;
+    newPatientCount: number;
+    returningPatientCount: number;
+    totalCollected: number;
+}

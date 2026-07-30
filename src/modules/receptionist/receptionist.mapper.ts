@@ -1,4 +1,4 @@
-import { AppointmentDto, DoctorDto, DashboardResponseDto, DoctorDashboardResponseDto } from "./receptionist.dtos";
+import { AppointmentDto, DoctorDto, DashboardResponseDto, DoctorDashboardResponseDto, AppointmentHistoryItemDto } from "./receptionist.dtos";
 import { isPromotedWalkIn, sortAppointmentsByQueuePriority } from "./receptionist.queue.util";
 
 export class ReceptionistMapper {
@@ -179,6 +179,30 @@ export class ReceptionistMapper {
             advanceBookingQueue,
             walkInBookingQueue,
             pendingAppointments
+        };
+    }
+
+    private static readonly HISTORY_STATUS_MAP: Record<number, 'completed' | 'walked-out' | 'cancelled'> = {
+        6: 'completed',
+        15: 'walked-out',
+        7: 'cancelled',
+    };
+
+    public static toAppointmentHistoryItemDto(appt: any): AppointmentHistoryItemDto {
+        return {
+            appointment_id: appt.appointment_id,
+            date: appt.appointment_date.toISOString(),
+            status: this.HISTORY_STATUS_MAP[appt.appointment_status_id] ?? 'cancelled',
+            patient_name: `${appt.patient.first_name}${appt.patient.middle_name ? ' ' + appt.patient.middle_name : ''} ${appt.patient.last_name}`,
+            mobile_number: appt.patient.mobile_number,
+            doctor_name: appt.doctor ? `Dr. ${appt.doctor.first_name} ${appt.doctor.last_name}` : 'N/A',
+            queue_type: appt.queue?.queue_type === 'WALK_IN' ? 'walk-in' : appt.queue?.queue_type === 'BOOKED' ? 'booked' : null,
+            payment_status: appt.payment ? 'paid' : 'none',
+            total_amount: appt.payment?.total_amount?.toString(),
+            payment_method: appt.payment?.payment_method,
+            receipt_no: appt.payment?.receipt_no,
+            patient_type: appt.payment?.consultation_fee_type,
+            tests_ordered_count: appt.test_orders?.length ?? 0,
         };
     }
 }

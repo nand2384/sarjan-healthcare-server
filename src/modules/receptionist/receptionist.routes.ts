@@ -69,3 +69,24 @@ receptionistRouter.post(
     validate(checkoutSchema),
     receptionistController.checkout.bind(receptionistController)
 );
+
+receptionistRouter.get(
+    "/appointments/history",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    receptionistController.getAppointmentHistory.bind(receptionistController)
+);
+
+receptionistRouter.get(
+    "/appointments/history/summary",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    receptionistController.getAppointmentHistorySummary.bind(receptionistController)
+);
+
+receptionistRouter.get(
+    "/appointments/:id/receipt",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    receptionistController.getReceipt.bind(receptionistController)
+);

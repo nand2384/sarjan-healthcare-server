@@ -201,4 +201,12 @@ export class BillingService {
 
         return result;
     }
+
+    // --- Receipt Recovery ---
+
+    public async getReceipt(appointmentId: number) {
+        const receipt = await this.billingRepository.getReceiptByAppointmentId(appointmentId);
+        if (!receipt) throw new AppError(404, ErrorCode.NOT_FOUND, "No payment found for this appointment.");
+        return receipt;
+    }
 }

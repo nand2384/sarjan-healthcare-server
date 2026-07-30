@@ -149,4 +149,64 @@ export class ReceptionistController {
             data
         });
     }
+
+    public async getAppointmentHistory(req: Request, res: Response) {
+        const { start, end, doctor_id, queue_type, status, search, page, limit } = req.query;
+
+        if (!start || !end || typeof start !== "string" || typeof end !== "string") {
+            throw new AppError(400, ErrorCode.BAD_REQUEST, "start and end date query parameters are required (YYYY-MM-DD).");
+        }
+
+        const startDate = new Date(`${start}T00:00:00`);
+        const endDate = new Date(`${end}T23:59:59.999`);
+
+        const data = await this.receptionistService.getAppointmentHistory({
+            startDate,
+            endDate,
+            doctorId: doctor_id ? Number(doctor_id) : undefined,
+            queueType: queue_type as 'BOOKED' | 'WALK_IN' | undefined,
+            status: status as 'completed' | 'walked-out' | 'cancelled' | undefined,
+            search: search as string | undefined,
+            page: page ? Number(page) : 1,
+            limit: limit ? Number(limit) : 20,
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Fetched appointment history successfully",
+            data
+        });
+    }
+
+    public async getAppointmentHistorySummary(req: Request, res: Response) {
+        const { start, end } = req.query;
+
+        if (!start || !end || typeof start !== "string" || typeof end !== "string") {
+            throw new AppError(400, ErrorCode.BAD_REQUEST, "start and end date query parameters are required (YYYY-MM-DD).");
+        }
+
+        const startDate = new Date(`${start}T00:00:00`);
+        const endDate = new Date(`${end}T23:59:59.999`);
+
+        const data = await this.receptionistService.getAppointmentHistorySummary(startDate, endDate);
+        return res.status(200).json({
+            success: true,
+            message: "Fetched appointment history summary successfully",
+            data
+        });
+    }
+
+    public async getReceipt(req: Request, res: Response) {
+        const appointmentId = parseInt(req.params.id as string);
+        if (isNaN(appointmentId)) {
+            throw new AppError(400, ErrorCode.BAD_REQUEST, "Invalid appointment ID");
+        }
+
+        const data = await this.receptionistService.getReceipt(appointmentId);
+        return res.status(200).json({
+            success: true,
+            message: "Fetched receipt successfully",
+            data
+        });
+    }
 }

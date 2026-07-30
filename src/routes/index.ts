@@ -9,6 +9,7 @@ import { doctorRouter } from "@modules/doctor/doctor.routes";
 import { receptionistRouter } from "@modules/receptionist/receptionist.routes";
 import { notificationRouter } from "@modules/notification/notification.routes";
 import { billingRouter } from "@modules/billing/billing.routes";
+import { financeRouter } from "@modules/finance/finance.routes";
 
 // Remove on removing redis/clear API
 import { env } from "node:process";
@@ -31,6 +32,7 @@ router.use("/patients", patientRouter);
 router.use("/receptionist", receptionistRouter);
 router.use("/notifications", notificationRouter);
 router.use("/billing", billingRouter);
+router.use("/admin/finance", financeRouter);
 
 router.get("/dev/redis/clear", async (_req, res, next) => {
     try {

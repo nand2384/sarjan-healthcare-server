@@ -327,4 +327,18 @@ export class BillingRepository {
             return { payment, line_items: lineItems, appointment: updatedAppointment };
         });
     }
+
+    // --- Receipt Recovery (Phase 6) ---
+
+    public async getReceiptByAppointmentId(appointmentId: number, tx?: Prisma.TransactionClient) {
+        const prisma = tx ?? this.prisma;
+        return prisma.payment.findUnique({
+            where: { appointment_id: appointmentId },
+            include: {
+                line_items: true,
+                patient: true,
+                appointment: { include: { doctor: true } },
+            }
+        });
+    }
 }
