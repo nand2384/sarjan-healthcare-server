@@ -291,7 +291,7 @@ export class AuthService {
                 resetLink,
             });
         } catch (error) {
-            logger.error(`Failed to send password reset email to ${email}`, error);
+            logger.error({ err: error }, `Failed to send password reset email to ${email}`);
         }
 
         return { success: true, message: "If an account exists with that email, you will receive password reset instructions." };
@@ -359,7 +359,7 @@ export class AuthService {
                 resetLink,
             });
         } catch (error) {
-            logger.error(`Failed to send password reset email for staff ${staffId}`, error);
+            logger.error({ err: error }, `Failed to send password reset email for staff ${staffId}`);
         }
 
         return { success: true, message: "Password reset email sent successfully" };
