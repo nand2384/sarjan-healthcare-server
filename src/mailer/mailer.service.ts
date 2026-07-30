@@ -1,8 +1,8 @@
 import { env } from "@config";
 
 import { mailTransporter } from "./mailer.provider";
-import { staffActivationTemplate, doctorFeeMissingTemplate } from "./mailer.templates";
-import { SendMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions } from "./mailer.types";
+import { staffActivationTemplate, doctorFeeMissingTemplate, passwordResetTemplate } from "./mailer.templates";
+import { SendMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions, SendPasswordResetMailOptions } from "./mailer.types";
 
 export class MailerService {
     async send({ to, subject, html }: SendMailOptions): Promise<void> {
@@ -36,6 +36,23 @@ export class MailerService {
             to,
             subject: "Action required: Doctor consultation fees not configured",
             html: doctorFeeMissingTemplate({ doctorName }),
+        });
+    }
+
+    async sendPasswordResetMail({
+        to,
+        firstName,
+        username,
+        resetLink,
+    }: SendPasswordResetMailOptions): Promise<void> {
+        await this.send({
+            to,
+            subject: "Reset your Sarjan Healthcare password",
+            html: passwordResetTemplate({
+                firstName,
+                username,
+                resetLink,
+            }),
         });
     }
 }

@@ -123,6 +123,12 @@ interface DoctorFeeMissingTemplateOptions {
     doctorName: string;
 }
 
+interface PasswordResetTemplateOptions {
+    firstName: string;
+    username: string;
+    resetLink: string;
+}
+
 export function doctorFeeMissingTemplate({ doctorName }: DoctorFeeMissingTemplateOptions): string {
     return emailLayout({
         title: "Action required: Doctor consultation fees not configured",
@@ -170,6 +176,42 @@ export function staffActivationTemplate({
 <p style="margin-top: 0; margin-bottom: 16px; font-size: 14px;">For security reasons, this activation link will expire in 7 days.</p>
 
 <p style="margin-top: 0; margin-bottom: 0; font-size: 14px; color: #A0AAB5;">If you did not expect this email or believe it was sent in error, you can safely ignore it. Your account will remain inactive.</p>
+`,
+    });
+}
+
+export function passwordResetTemplate({
+    firstName,
+    username,
+    resetLink,
+}: PasswordResetTemplateOptions): string {
+    return emailLayout({
+        title: "Reset your Sarjan Healthcare password",
+        heading: `Reset your password, ${firstName}`,
+        content: `
+<p style="margin-top: 0; margin-bottom: 16px;">We received a request to reset the password for your Sarjan Healthcare account.</p>
+
+<p style="margin-top: 0; margin-bottom: 16px;">Your login username is: <strong style="color: #0F172A; background-color: #F1F5F9; padding: 2px 8px; border-radius: 4px; font-family: monospace;">${username}</strong></p>
+
+<p style="margin-top: 0; margin-bottom: 24px;">Click the button below to create a new password. This link will expire in 1 hour.</p>
+
+<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
+  <tr>
+    <td>
+      <table border="0" cellspacing="0" cellpadding="0">
+        <tr>
+          <td align="center" style="border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" bgcolor="#138B78">
+            <a href="${resetLink}" target="_blank" style="font-size: 15px; font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #ffffff; text-decoration: none; border-radius: 8px; padding: 12px 24px; display: inline-block; font-weight: 600;">Reset Password</a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<p style="margin-top: 0; margin-bottom: 16px; font-size: 14px;">For security reasons, this password reset link will expire in 1 hour.</p>
+
+<p style="margin-top: 0; margin-bottom: 0; font-size: 14px; color: #A0AAB5;">If you did not request this password reset or believe it was sent in error, you can safely ignore this email. Your password will not be changed.</p>
 `,
     });
 }

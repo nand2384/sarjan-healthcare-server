@@ -37,9 +37,30 @@ export const changePasswordSchema = z.object({
     path: ["newPassword"],
 });
 
+export const forgotPasswordSchema = z.object({
+    email: z.string().email("Invalid email address"),
+});
+
+export const resetPasswordVerifySchema = z.object({
+    resetToken: z.string().trim(),
+});
+
+export const resetPasswordCompleteSchema = z.object({
+    staff_id: z.number(),
+    resetToken: z.string().trim(),
+    password: z.string().trim().min(8, "Password is required"),
+    confirmPassword: z.string().trim().min(8, "Confirm password is required"),
+}).refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+});
+
 export type LoginSchema = z.infer<typeof loginSchema>;
 export type ActivationVerifySchema = z.infer<typeof activationVerifySchema>;
 export type ActivationCompleteSchema = z.infer<typeof activationCompleteSchema>;
 export type ResendActivationSchema = z.infer<typeof resendActivationScham>;
 export type UpdateProfileSchema = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordSchema = z.infer<typeof changePasswordSchema>;
+export type ForgotPasswordSchema = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordVerifySchema = z.infer<typeof resetPasswordVerifySchema>;
+export type ResetPasswordCompleteSchema = z.infer<typeof resetPasswordCompleteSchema>;

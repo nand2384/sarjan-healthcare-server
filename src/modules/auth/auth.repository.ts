@@ -12,6 +12,7 @@ export class AuthRepository {
                 staff_id: true,
                 first_name: true,
                 last_name: true,
+                username: true,
                 email: true,
                 mobile_number: true,
                 password_hash: true,
@@ -171,6 +172,72 @@ export class AuthRepository {
                 password_hash: hashedPassword,
             }
         });
-            
+    }
+
+    public async findStaffByEmail(email: string) {
+        return await this.prisma.staff.findFirst({
+            where: {
+                email,
+                deleted_at: null,
+                is_disabled: false,
+            },
+            select: {
+                staff_id: true,
+                first_name: true,
+                username: true,
+                email: true,
+            }
+        });
+    }
+
+    public async getStaffByPasswordResetToken(resetToken: string) {
+        return await this.prisma.staff.findUnique({
+            where: {
+                password_reset_token: resetToken,
+            },
+            select: {
+                staff_id: true,
+                first_name: true,
+                username: true,
+                password_reset_token: true,
+                password_reset_token_expires_at: true,
+            }
+        });
+    }
+
+    public async setPasswordResetToken(staffId: number, resetToken: string, expiresAt: Date) {
+        return await this.prisma.staff.update({
+            where: {
+                staff_id: staffId,
+            },
+            data: {
+                password_reset_token: resetToken,
+                password_reset_token_expires_at: expiresAt,
+            },
+            select: {
+                staff_id: true,
+                first_name: true,
+                username: true,
+                email: true,
+            }
+        });
+    }
+
+    public async completePasswordReset(staffId: number, hashedPassword: string) {
+        return await this.prisma.staff.update({
+            where: {
+                staff_id: staffId,
+            },
+            data: {
+                password_hash: hashedPassword,
+                password_reset_token: null,
+                password_reset_token_expires_at: null,
+            },
+            select: {
+                staff_id: true,
+                first_name: true,
+                username: true,
+            }
+        });
     }
 }

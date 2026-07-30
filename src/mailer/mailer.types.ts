@@ -15,3 +15,10 @@ export interface SendDoctorFeeMissingAlertOptions {
     to: string;
     doctorName: string;
 }
+
+export interface SendPasswordResetMailOptions {
+    to: string;
+    firstName: string;
+    username: string;
+    resetLink: string;
+}

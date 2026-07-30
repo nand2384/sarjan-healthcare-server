@@ -17,6 +17,7 @@ import { logger } from "@logger";
 import { StaffMapper } from "./staff.mapper";
 import { UpdateStaffDto } from "./staff.schema";
 import { StaffListEntity } from "./staff.types";
+import { AuthService } from "@modules/auth/auth.service";
 
 export class StaffService {
     constructor(
@@ -26,6 +27,7 @@ export class StaffService {
         private readonly masterRepository: MasterRepository,
         private readonly auditService: AuditService,
         private readonly mailerService: MailerService,
+        private readonly authService: AuthService,
     ) {}
 
     public async createStaff(dto: CreateStaffDto, auditContext: { performed_by_staff_id: number, ip_address: string, user_agent: string }) {
@@ -320,40 +322,17 @@ export class StaffService {
     }
 
     public async triggerPasswordReset(staffId: number, auditContext: { performed_by_staff_id: number, ip_address: string, user_agent: string }) {
-        const staff = await this.staffRepository.findById(staffId);
-        if (!staff) throw new AppError(404, ErrorCode.NOT_FOUND, "Staff not found.");
-
-        const activationToken = crypto.randomBytes(32).toString("hex");
-        const activationTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-        await this.prisma.staff.update({
-            where: { staff_id: staffId },
-            data: {
-                activation_token: activationToken,
-                activation_token_expires_at: activationTokenExpiresAt,
-            }
-        });
-
-        const activationLink = `${env.FRONTEND_URL}/activate-account?token=${activationToken}`;
-
-        this.mailerService.sendStaffActivationMail({
-            to: staff.email,
-            firstName: staff.first_name,
-            username: staff.username,
-            activationLink,
-        }).catch(error => {
-            logger.error(error, "Failed to send password reset email.");
-        });
+        const result = await this.authService.adminTriggerPasswordReset(staffId, { performed_by_staff_id: auditContext.performed_by_staff_id });
 
         await this.auditService.log({
             ...auditContext,
             entity_type: AuditEntityType.STAFF,
             entity_id: staffId.toString(),
-            action: AuditAction.RESET_PASSWORD,
+            action: AuditAction.PASSWORD_RESET_REQUESTED,
             old_values: {},
-            new_values: { event: "Password reset triggered" },
+            new_values: { event: "Admin triggered password reset" },
         });
 
-        return { success: true, message: "Password reset email sent." };
+        return result;
     }
 }

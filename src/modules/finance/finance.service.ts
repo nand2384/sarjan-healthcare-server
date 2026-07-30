@@ -15,6 +15,7 @@ export class FinanceService {
         let totalWalkIns = 0;
 
         const doctorMap = new Map<number, DoctorFinanceBreakdownDto>();
+        const dailyRevenueMap = new Map<string, number>();
 
         for (const appt of appointments) {
             if (appt.queue?.queue_type === 'WALK_IN') totalWalkIns++;
@@ -46,6 +47,9 @@ export class FinanceService {
                 totalConsultationsBilled += 1;
                 doctorStats.total_revenue += amount;
 
+                const dateKey = appt.appointment_date.toISOString().split('T')[0];
+                dailyRevenueMap.set(dateKey, (dailyRevenueMap.get(dateKey) || 0) + amount);
+
                 for (const lineItem of appt.payment.line_items) {
                     if (lineItem.item_type === 'CONSULTATION') doctorStats.consultation_revenue += Number(lineItem.amount);
                     else doctorStats.test_revenue += Number(lineItem.amount);
@@ -60,11 +64,16 @@ export class FinanceService {
             }
         }
 
+        const daily_revenue = Array.from(dailyRevenueMap.entries())
+            .map(([date, revenue]) => ({ date, revenue }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+
         return {
             total_revenue: totalRevenue,
             total_consultations_billed: totalConsultationsBilled,
             total_walk_ins: totalWalkIns,
             new_registrations: newRegistrations,
+            daily_revenue,
             doctors: Array.from(doctorMap.values()),
         };
     }

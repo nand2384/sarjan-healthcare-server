@@ -267,4 +267,101 @@ export class AuthService {
     public async revokeAllOtherSessions(staffId: number, currentSessionId: string) {
         await this.sessionService.revokeAllOtherSessions(staffId, currentSessionId);
     }
+
+    public async requestPasswordReset(email: string) {
+        const staff = await this.authRepository.findStaffByEmail(email);
+
+        // Always return generic success response to prevent email enumeration
+        if (!staff) {
+            return { success: true, message: "If an account exists with that email, you will receive password reset instructions." };
+        }
+
+        const resetToken = require('crypto').randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+
+        await this.authRepository.setPasswordResetToken(staff.staff_id, resetToken, expiresAt);
+
+        const resetLink = `${env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+        try {
+            await this.mailerService.sendPasswordResetMail({
+                to: email,
+                firstName: staff.first_name,
+                username: staff.username,
+                resetLink,
+            });
+        } catch (error) {
+            logger.error(`Failed to send password reset email to ${email}`, error);
+        }
+
+        return { success: true, message: "If an account exists with that email, you will receive password reset instructions." };
+    }
+
+    public async verifyPasswordResetToken(resetToken: string) {
+        const staff = await this.authRepository.getStaffByPasswordResetToken(resetToken);
+
+        if (!staff) {
+            throw new AppError(404, ErrorCode.INVALID_RESET_TOKEN, "Invalid or expired password reset link");
+        }
+
+        if (!staff.password_reset_token_expires_at || staff.password_reset_token_expires_at < new Date()) {
+            throw new AppError(401, ErrorCode.INVALID_RESET_TOKEN, "Password reset link has expired");
+        }
+
+        return {
+            staff_id: staff.staff_id,
+            first_name: staff.first_name,
+            username: staff.username,
+            resetToken: staff.password_reset_token!,
+        };
+    }
+
+    public async completePasswordReset(staffId: number, resetToken: string, newPassword: string) {
+        const staff = await this.authRepository.getStaffByPasswordResetToken(resetToken);
+
+        if (!staff || staff.staff_id !== staffId) {
+            throw new AppError(401, ErrorCode.INVALID_RESET_TOKEN, "Invalid password reset token");
+        }
+
+        if (!staff.password_reset_token_expires_at || staff.password_reset_token_expires_at < new Date()) {
+            throw new AppError(401, ErrorCode.INVALID_RESET_TOKEN, "Password reset link has expired");
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        await this.authRepository.completePasswordReset(staffId, hashedPassword);
+
+        // Revoke all existing sessions for this staff member
+        await this.sessionService.revokeAllSessionsForStaff(staffId);
+
+        return { success: true, message: "Password reset successfully. Please log in with your new password." };
+    }
+
+    public async adminTriggerPasswordReset(staffId: number, auditContext: { performed_by_staff_id: number }) {
+        const staff = await this.authRepository.findStaffById(staffId);
+
+        if (!staff) {
+            throw new AppError(404, ErrorCode.ACCOUNT_NOT_FOUND, "Staff not found");
+        }
+
+        const resetToken = require('crypto').randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        await this.authRepository.setPasswordResetToken(staffId, resetToken, expiresAt);
+
+        const resetLink = `${env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+        try {
+            await this.mailerService.sendPasswordResetMail({
+                to: staff.email,
+                firstName: staff.first_name,
+                username: staff.username,
+                resetLink,
+            });
+        } catch (error) {
+            logger.error(`Failed to send password reset email for staff ${staffId}`, error);
+        }
+
+        return { success: true, message: "Password reset email sent successfully" };
+    }
 }

@@ -62,6 +62,37 @@ export interface ResendActivationResponseDto {
     message: string;
 }
 
+export interface ForgotPasswordRequestDto {
+    email: string;
+}
+
+export type ForgotPasswordResponseDto = {
+    success: boolean;
+    message: string;
+}
+
+export interface VerifyResetTokenRequestDto {
+    resetToken: string;
+}
+
+export type VerifyResetTokenResponse = {
+    staff_id: number;
+    first_name: string;
+    username: string;
+    resetToken: string;
+}
+
+export interface CompleteResetPasswordRequestDto {
+    staff_id: number;
+    resetToken: string;
+    password: string;
+}
+
+export type CompleteResetPasswordResponseDto = {
+    success: boolean;
+    message: string;
+}
+
 export interface GetProfileDetailDto {
     success: boolean;
     data: {

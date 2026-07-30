@@ -13,11 +13,17 @@ export interface DoctorFinanceBreakdownDto {
     upi_amount: number;
 }
 
+export interface DailyRevenueDto {
+    date: string;
+    revenue: number;
+}
+
 export interface FinanceSummaryDto {
     total_revenue: number;
     total_consultations_billed: number;
     total_walk_ins: number;
     new_registrations: number;
+    daily_revenue: DailyRevenueDto[];
     doctors: DoctorFinanceBreakdownDto[];
 }
 

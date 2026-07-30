@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { AuthController } from "./auth.controller";
 import { appContext } from "app.context";
-import { activationCompleteSchema, activationVerifySchema, changePasswordSchema, loginSchema, resendActivationScham, updateProfileSchema } from "./auth.schema";
+import { activationCompleteSchema, activationVerifySchema, changePasswordSchema, forgotPasswordSchema, loginSchema, resendActivationScham, resetPasswordCompleteSchema, resetPasswordVerifySchema, updateProfileSchema } from "./auth.schema";
 import { authMiddleware, roleMiddleware, validate, authRateLimiter } from "@middleware";
 import { USER_ROLE } from "common/common.schema";
 
@@ -74,4 +74,22 @@ authRouter.delete("/sessions/others",
 authRouter.delete("/sessions/:sessionId",
     authMiddleware,
     authController.revokeSession.bind(authController)
+);
+
+authRouter.post("/password/forgot",
+    authRateLimiter,
+    validate(forgotPasswordSchema),
+    authController.forgotPassword.bind(authController)
+);
+
+authRouter.post("/password/reset/verify",
+    authRateLimiter,
+    validate(resetPasswordVerifySchema),
+    authController.verifyResetToken.bind(authController)
+);
+
+authRouter.post("/password/reset/complete",
+    authRateLimiter,
+    validate(resetPasswordCompleteSchema),
+    authController.completePasswordReset.bind(authController)
 );

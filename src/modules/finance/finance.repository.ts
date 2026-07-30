@@ -8,6 +8,7 @@ export class FinanceRepository {
             where: { appointment_date: { gte: startDate, lte: endDate } },
             select: {
                 appointment_id: true,
+                appointment_date: true,
                 doctor_staff_id: true,
                 doctor: { select: { first_name: true, last_name: true } },
                 queue: { select: { queue_type: true } },

@@ -98,4 +98,23 @@ export class SessionRepository {
             }
         });
     }
+
+    public async findSessionsByStaffId(staffId: number) {
+        return await this.prisma.session.findMany({
+            where: {
+                staff_id: staffId
+            },
+            select: {
+                session_id: true
+            }
+        });
+    }
+
+    public async deleteAllSessionsForStaff(staffId: number) {
+        return await this.prisma.session.deleteMany({
+            where: {
+                staff_id: staffId
+            }
+        });
+    }
 }

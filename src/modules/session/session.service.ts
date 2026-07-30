@@ -139,13 +139,26 @@ export class SessionService {
     public async revokeAllOtherSessions(staffId: number, currentSessionId: string) {
         // 1. Fetch other session IDs from Postgres
         const otherSessions = await this.sessionRepository.findOtherSessionsByStaffId(staffId, currentSessionId);
-        
+
         // 2. Delete from Redis
         for (const session of otherSessions) {
             await this.redisClient.del(`session:${session.session_id}`);
         }
-        
+
         // 3. Delete from Postgres
         await this.sessionRepository.deleteOtherSessions(staffId, currentSessionId);
+    }
+
+    public async revokeAllSessionsForStaff(staffId: number) {
+        // 1. Fetch all session IDs for this staff from Postgres
+        const allSessions = await this.sessionRepository.findSessionsByStaffId(staffId);
+
+        // 2. Delete from Redis
+        for (const session of allSessions) {
+            await this.redisClient.del(`session:${session.session_id}`);
+        }
+
+        // 3. Delete from Postgres
+        await this.sessionRepository.deleteAllSessionsForStaff(staffId);
     }
 }

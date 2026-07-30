@@ -149,15 +149,17 @@ export class PatientRepository {
                 ]
             }));
         } else {
-            // General Patients List: explicitly do not show patients who currently hold an active or upcoming booked appointment
+            // General Patients List: exclude patients with an active appointment TODAY only.
+            // Patients with future appointments or completed/cancelled/walked-out today should still appear.
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
             where.appointments = {
                 none: {
-                    appointment_date: { gte: today },
-                    appointment_status: {
-                        value_name: { notIn: ['CANCELLED', 'COMPLETED', 'DISCHARGED'] }
-                    }
+                    appointment_date: { gte: today, lt: tomorrow },
+                    // Only exclude if the appointment is still active (not a terminal status)
+                    appointment_status_id: { notIn: [6, 7, 15] } // COMPLETED, CANCELLED, WALKED_OUT
                 }
             };
         }

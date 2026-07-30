@@ -155,4 +155,34 @@ export class AuthController {
             message: "All other sessions revoked successfully",
         });
     }
+
+    public async forgotPassword(req: Request, res: Response) {
+        const { email } = req.body;
+        const response = await this.authService.requestPasswordReset(email);
+
+        return res.status(200).json({
+            success: response.success,
+            message: response.message,
+        });
+    }
+
+    public async verifyResetToken(req: Request, res: Response) {
+        const { resetToken } = req.body;
+        const response = await this.authService.verifyPasswordResetToken(resetToken);
+
+        return res.status(200).json({
+            success: true,
+            data: response,
+        });
+    }
+
+    public async completePasswordReset(req: Request, res: Response) {
+        const { staff_id, resetToken, password } = req.body;
+        const response = await this.authService.completePasswordReset(staff_id, resetToken, password);
+
+        return res.status(200).json({
+            success: response.success,
+            message: response.message,
+        });
+    }
 }

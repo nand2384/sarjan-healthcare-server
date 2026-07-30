@@ -19,6 +19,8 @@ enum AuditAction {
   LOGIN
   LOGOUT
   RESET_PASSWORD
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
   CHANGE_PASSWORD
   ENABLE
   DISABLE
@@ -175,6 +177,9 @@ model Staff {
 
   activation_token            String?   @unique
   activation_token_expires_at DateTime?
+
+  password_reset_token            String?   @unique
+  password_reset_token_expires_at DateTime?
 
   current_challenge    String?
   challenge_created_at DateTime?

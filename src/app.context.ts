@@ -47,7 +47,7 @@ const masterRepository = new MasterRepository(prisma);
 const masterService = new MasterService(masterRepository, redisClient, auditService);
 
 const staffRepository = new StaffRepository(prisma);
-const staffService = new StaffService(prisma, staffRepository, staffRoleRepository, masterRepository, auditService, mailerService);
+const staffService = new StaffService(prisma, staffRepository, staffRoleRepository, masterRepository, auditService, mailerService, authService);
 
 const doctorRepository = new DoctorRepository(prisma);
 const doctorService = new DoctorService(prisma, doctorRepository, staffRepository, staffRoleRepository, auditService, mailerService);

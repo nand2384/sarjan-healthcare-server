@@ -204,7 +204,8 @@ export class ReceptionistRepository {
     public async checkInPatientTx(appointmentId: number, createdByStaffId: number) {
         return this.prisma.$transaction(async (tx) => {
             const appointment = await tx.appointment.findUnique({
-                where: { appointment_id: appointmentId }
+                where: { appointment_id: appointmentId },
+                include: { queue: true }
             });
 
             if (!appointment) throw new AppError(404, ErrorCode.NOT_FOUND, "Appointment not found");
@@ -224,33 +225,37 @@ export class ReceptionistRepository {
                 }
             });
 
-            const today = new Date();
-            today.setUTCHours(0, 0, 0, 0);
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
+            // If queue already exists, reuse it; otherwise create new queue entry
+            let queue = appointment.queue;
+            if (!queue) {
+                const today = new Date();
+                today.setUTCHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
 
-            const lastQueue = await tx.queue.findFirst({
-                where: {
-                    appointment: {
-                        doctor_staff_id: appointment.doctor_staff_id,
-                        appointment_date: { gte: today, lt: tomorrow }
+                const lastQueue = await tx.queue.findFirst({
+                    where: {
+                        appointment: {
+                            doctor_staff_id: appointment.doctor_staff_id,
+                            appointment_date: { gte: today, lt: tomorrow }
+                        }
+                    },
+                    orderBy: { queue_number: 'desc' }
+                });
+
+                const nextQueueNumber = lastQueue ? lastQueue.queue_number + 1 : 1;
+
+                queue = await tx.queue.create({
+                    data: {
+                        appointment_id: appointmentId,
+                        queue_number: nextQueueNumber,
+                        queue_type: QueueType.BOOKED,
+                        joined_queue_at: new Date(),
+                        joined_after_consultation_sequence: 0,
+                        is_active: true
                     }
-                },
-                orderBy: { queue_number: 'desc' }
-            });
-
-            const nextQueueNumber = lastQueue ? lastQueue.queue_number + 1 : 1;
-
-            const queue = await tx.queue.create({
-                data: {
-                    appointment_id: appointmentId,
-                    queue_number: nextQueueNumber,
-                    queue_type: QueueType.BOOKED,
-                    joined_queue_at: new Date(),
-                    joined_after_consultation_sequence: 0,
-                    is_active: true
-                }
-            });
+                });
+            }
 
             return { appointment: updatedAppointment, queue };
         });
