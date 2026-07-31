@@ -11,12 +11,13 @@ export class NotificationController {
             throw new AppError(401, ErrorCode.UNAUTHORIZED, "User not authenticated");
         }
 
-        const { page, limit } = req.query;
+        const { page, limit, unread } = req.query;
 
         const data = await this.notificationService.getNotifications(
             staffId,
             page ? Number(page) : 1,
             limit ? Number(limit) : 20,
+            unread === "true",
         );
 
         return res.status(200).json({
@@ -50,6 +51,19 @@ export class NotificationController {
         }
 
         const data = await this.notificationService.markAsRead(notificationId, staffId);
+        return res.status(200).json({
+            success: true,
+            data,
+        });
+    };
+
+    public markAllAsRead = async (req: Request, res: Response) => {
+        const staffId = req.session?.staff_id;
+        if (!staffId) {
+            throw new AppError(401, ErrorCode.UNAUTHORIZED, "User not authenticated");
+        }
+
+        const data = await this.notificationService.markAllAsRead(staffId);
         return res.status(200).json({
             success: true,
             data,

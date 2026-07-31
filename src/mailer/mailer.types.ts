@@ -28,4 +28,11 @@ export interface SendEmailChangeConfirmationMailOptions {
     firstName: string;
     username: string;
     confirmLink: string;
+}
+
+export interface SendAnnouncementMailOptions {
+    to: string;
+    firstName: string;
+    message: string;
+    type: "info" | "warning" | "danger";
 }

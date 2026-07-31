@@ -34,9 +34,11 @@ export class ReceptionistService {
         let endDate: Date;
 
         if (startDateStr && endDateStr) {
-            // Append time to parse as local time (Server time) instead of UTC midnight
-            startDate = new Date(`${startDateStr}T00:00:00`);
-            endDate = new Date(`${endDateStr}T23:59:59.999`);
+            // Parsed as UTC: appointment_date is a @db.Date column, which Prisma
+            // materializes at UTC midnight. Parsing in server-local time would shift
+            // the window and pull in the adjacent calendar day.
+            startDate = new Date(`${startDateStr}T00:00:00.000Z`);
+            endDate = new Date(`${endDateStr}T23:59:59.999Z`);
         } else {
             const now = new Date();
             // Default to start of current month to end of next month
@@ -84,11 +86,19 @@ export class ReceptionistService {
         const targetStatusId = statusMap[statusName];
         if (!targetStatusId) throw new AppError(400, ErrorCode.BAD_REQUEST, "Invalid status");
 
-        return this.receptionistRepository.updateAppointmentStatusTx(appointmentId, targetStatusId, statusName, staffId);
+        const result = await this.receptionistRepository.updateAppointmentStatusTx(appointmentId, targetStatusId, statusName, staffId);
+
+        WebSocketPublisher.queueUpdated({ appointmentId }, staffId, result.doctor_staff_id);
+
+        return result;
     }
 
     public async sendForTests(appointmentId: number, testCatalogIds: number[], staffId: number) {
-        return this.billingRepository.sendForTestsTx(appointmentId, testCatalogIds, staffId);
+        const result = await this.billingRepository.sendForTestsTx(appointmentId, testCatalogIds, staffId);
+
+        WebSocketPublisher.queueUpdated({ appointmentId }, staffId, result.appointment.doctor_staff_id);
+
+        return result;
     }
 
     public async getCheckoutInfo(appointmentId: number) {
@@ -102,7 +112,15 @@ export class ReceptionistService {
         paymentMethod: CheckoutPaymentMethod,
         auditContext: AuditContext,
     ) {
-        return this.billingService.checkout(appointmentId, staffId, additionalTestCatalogIds, paymentMethod, auditContext);
+        const result = await this.billingService.checkout(appointmentId, staffId, additionalTestCatalogIds, paymentMethod, auditContext);
+
+        // Checkout removes the patient from the active queue — everyone else's board must reflect that.
+        const appointment = await this.billingRepository.getAppointmentForCheckout(appointmentId);
+        if (appointment) {
+            WebSocketPublisher.queueUpdated({ appointmentId }, staffId, appointment.doctor_staff_id);
+        }
+
+        return result;
     }
 
     public async getAppointmentHistory(filters: AppointmentHistoryFilters) {

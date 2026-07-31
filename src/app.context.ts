@@ -27,6 +27,8 @@ import { BillingRepository } from "@modules/billing/billing.repository";
 import { BillingService } from "@modules/billing/billing.service";
 import { FinanceRepository } from "@modules/finance/finance.repository";
 import { FinanceService } from "@modules/finance/finance.service";
+import { AnnouncementRepository } from "@modules/announcement/announcement.repository";
+import { AnnouncementService } from "@modules/announcement/announcement.service";
 
 const auditRepository = new AuditRepository(prisma);
 const auditService = new AuditService(auditRepository);
@@ -70,6 +72,9 @@ const receptionistService = new ReceptionistService(receptionistRepository, bill
 const financeRepository = new FinanceRepository(prisma);
 const financeService = new FinanceService(financeRepository);
 
+const announcementRepository = new AnnouncementRepository(prisma);
+const announcementService = new AnnouncementService(prisma, announcementRepository, staffRepository, notificationRepository, notificationService, mailerService);
+
 export const appContext = Object.freeze({
     logger,
     prisma,
@@ -90,6 +95,7 @@ export const appContext = Object.freeze({
         notificationService,
         billingService,
         financeService,
+        announcementService,
     },
 });
 

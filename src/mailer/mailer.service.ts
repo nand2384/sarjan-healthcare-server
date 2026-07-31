@@ -1,8 +1,8 @@
 import { env } from "@config";
 
 import { mailTransporter } from "./mailer.provider";
-import { staffActivationTemplate, doctorFeeMissingTemplate, passwordResetTemplate, emailChangeConfirmationTemplate } from "./mailer.templates";
-import { SendMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions, SendPasswordResetMailOptions, SendEmailChangeConfirmationMailOptions } from "./mailer.types";
+import { staffActivationTemplate, doctorFeeMissingTemplate, passwordResetTemplate, emailChangeConfirmationTemplate, announcementTemplate } from "./mailer.templates";
+import { SendMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions, SendPasswordResetMailOptions, SendEmailChangeConfirmationMailOptions, SendAnnouncementMailOptions } from "./mailer.types";
 
 export class MailerService {
     async send({ to, subject, html }: SendMailOptions): Promise<void> {
@@ -69,6 +69,25 @@ export class MailerService {
                 firstName,
                 username,
                 confirmLink,
+            }),
+        });
+    }
+
+    async sendAnnouncementMail({
+        to,
+        firstName,
+        message,
+        type,
+    }: SendAnnouncementMailOptions): Promise<void> {
+        const subject = type === "danger" ? "Urgent announcement from Sarjan Healthcare" : "New announcement from Sarjan Healthcare";
+
+        await this.send({
+            to,
+            subject,
+            html: announcementTemplate({
+                firstName,
+                message,
+                type,
             }),
         });
     }

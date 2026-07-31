@@ -286,4 +286,31 @@ export class StaffRepository {
 
         return admins.map((admin) => admin.staff_id);
     }
+
+    public async getActiveStaffIdsByRole(roleId: number, excludingStaffId?: number, tx?: Prisma.TransactionClient) {
+        const db = tx ?? this.prisma;
+
+        return db.staff.findMany({
+            where: {
+                deleted_at: null,
+                is_disabled: false,
+                staff_roles: { some: { role_id: roleId } },
+                ...(excludingStaffId ? { staff_id: { not: excludingStaffId } } : {}),
+            },
+            select: { staff_id: true, email: true, first_name: true },
+        });
+    }
+
+    public async getAllActiveStaffIds(excludingStaffId?: number, tx?: Prisma.TransactionClient) {
+        const db = tx ?? this.prisma;
+
+        return db.staff.findMany({
+            where: {
+                deleted_at: null,
+                is_disabled: false,
+                ...(excludingStaffId ? { staff_id: { not: excludingStaffId } } : {}),
+            },
+            select: { staff_id: true, email: true, first_name: true },
+        });
+    }
 }

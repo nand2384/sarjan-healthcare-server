@@ -6,8 +6,8 @@ import { WebSocketPublisher } from "websocket";
 export class NotificationService {
     constructor(private readonly notificationRepository: NotificationRepository) {}
 
-    public async getNotifications(staffId: number, page: number, limit: number) {
-        const { rows, total } = await this.notificationRepository.getByStaffId(staffId, page, limit);
+    public async getNotifications(staffId: number, page: number, limit: number, unreadOnly = false) {
+        const { rows, total } = await this.notificationRepository.getByStaffId(staffId, page, limit, unreadOnly);
         return { rows, total, page, limit };
     }
 
@@ -49,5 +49,20 @@ export class NotificationService {
         }
 
         return { success: true };
+    }
+
+    public async markAllAsRead(staffId: number) {
+        const result = await this.notificationRepository.markAllAsRead(staffId);
+        return { success: true, count: result.count };
+    }
+
+    /** Retention sweep — see scheduler/notification-cleanup.job.ts. Returns rows deleted. */
+    public async pruneOldNotifications(readRetentionDays: number, unreadRetentionDays: number) {
+        const now = Date.now();
+        const readCutoff = new Date(now - readRetentionDays * 24 * 60 * 60 * 1000);
+        const unreadCutoff = new Date(now - unreadRetentionDays * 24 * 60 * 60 * 1000);
+
+        const result = await this.notificationRepository.deleteOlderThan(readCutoff, unreadCutoff);
+        return result.count;
     }
 }

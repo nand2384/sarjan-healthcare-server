@@ -1,6 +1,7 @@
 import { RegisterAndBookRequestDto, RegisterAndBookResponseDto, SearchDuplicatesRequestDto, SearchDuplicatesResponseDto } from "./patient.dtos";
 import { PatientRepository } from "./patient.repository";
 import { PatientMapper } from "./patient.mapper";
+import { WebSocketPublisher } from "websocket";
 import { QueueType } from "@generated/prisma/client";
 import { AppError, ErrorCode } from "@errors";
 
@@ -91,10 +92,12 @@ export class PatientService {
 
         // Execute Transaction
         const { patient, appointment, queue } = await this.patientRepository.registerAndBookTx(
-            patientData as any, 
-            appointmentData, 
+            patientData as any,
+            appointmentData,
             queueData
         );
+
+        WebSocketPublisher.queueUpdated({ appointmentId: appointment.appointment_id }, createdByStaffId, appointment.doctor_staff_id);
 
         return PatientMapper.toRegisterAndBookResponse(patient, appointment, queue);
     }
@@ -192,6 +195,8 @@ export class PatientService {
             throw new AppError(404, ErrorCode.NOT_FOUND, "Patient not found");
         }
 
+        WebSocketPublisher.queueUpdated({ appointmentId: appointment.appointment_id }, createdByStaffId, appointment.doctor_staff_id);
+
         return PatientMapper.toRegisterAndBookResponse(patient, appointment, queue);
     }
 
@@ -262,10 +267,12 @@ export class PatientService {
 
         // Execute Transaction
         const { patient, appointment, queue } = await this.patientRepository.registerAndBookTx(
-            patientData as any, 
-            appointmentData, 
+            patientData as any,
+            appointmentData,
             queueData
         );
+
+        WebSocketPublisher.queueUpdated({ appointmentId: appointment.appointment_id }, createdByStaffId, appointment.doctor_staff_id);
 
         return PatientMapper.toRegisterAndBookResponse(patient, appointment, queue);
     }

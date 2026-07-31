@@ -5,7 +5,7 @@ import { appContext } from "./app.context";
 import { env } from "./config/env";
 import { connectDatabase } from "./database";
 import { redisClient } from "@cache";
-import { startSessionCleanupJob } from "@scheduler";
+import { startSessionCleanupJob, startNotificationCleanupJob } from "@scheduler";
 import { shutdown } from "./shutdown";
 import { setupWebSockets } from "./websocket";
 import { setHttpServer, setSocketServer, setWebSocketService } from "./server.instance";
@@ -18,6 +18,7 @@ async function startServer(): Promise<void> {
     await redisClient.connect();
 
     startSessionCleanupJob();
+    startNotificationCleanupJob();
 
     const httpServer = createServer(app);
 

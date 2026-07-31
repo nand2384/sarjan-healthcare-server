@@ -91,6 +91,8 @@ model RoleMaster {
 
   staff_roles StaffRole[]
 
+  announcements Announcement[]
+
   @@map("role_master")
 }
 
@@ -208,6 +210,9 @@ model Staff {
   passkey_credentials PasskeyCredential[]
 
   notifications Notification[]
+
+  announcements_created  Announcement[] @relation("AnnouncementCreatedBy")
+  announcements_targeted Announcement[] @relation("AnnouncementTargetStaff")
 
   test_orders_placed TestOrder[] @relation("TestOrderedBy")
 
@@ -705,12 +710,55 @@ model Notification {
   // Optional link for frontend navigation
   action_url String?
 
+  // Set when this notification was delivered as part of an announcement broadcast.
+  // Lets a withdrawal retract every delivered copy instead of orphaning them.
+  announcement_id Int?
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  staff Staff @relation(fields: [staff_id], references: [staff_id])
+  staff        Staff         @relation(fields: [staff_id], references: [staff_id])
+  announcement Announcement? @relation(fields: [announcement_id], references: [announcement_id], onDelete: Cascade)
 
   @@index([staff_id])
   @@index([is_read])
+  @@index([announcement_id])
+  @@index([created_at])
   @@map("notification")
+}
+
+enum AnnouncementTargetType {
+  STAFF
+  ROLE
+  ALL
+}
+
+model Announcement {
+  announcement_id Int @id @default(autoincrement())
+
+  message String
+  type    String // 'info' | 'warning' | 'danger'
+
+  target_type     AnnouncementTargetType
+  target_staff_id Int?
+  target_role_id  Int?
+
+  is_active    Boolean   @default(true)
+  withdrawn_at DateTime?
+
+  email_sent Boolean @default(false)
+
+  created_by_staff_id Int
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  created_by   Staff       @relation("AnnouncementCreatedBy", fields: [created_by_staff_id], references: [staff_id])
+  target_staff Staff?      @relation("AnnouncementTargetStaff", fields: [target_staff_id], references: [staff_id])
+  target_role  RoleMaster? @relation(fields: [target_role_id], references: [role_id])
+
+  notifications Notification[]
+
+  @@index([is_active])
+  @@map("announcement")
 }

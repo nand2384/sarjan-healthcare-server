@@ -24,6 +24,13 @@ notificationRouter.get(
 );
 
 notificationRouter.patch(
+    "/read-all",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    notificationController.markAllAsRead,
+);
+
+notificationRouter.patch(
     "/:id/read",
     authMiddleware,
     roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),

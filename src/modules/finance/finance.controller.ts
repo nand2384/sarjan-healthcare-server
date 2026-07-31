@@ -12,8 +12,8 @@ export class FinanceController {
             throw new AppError(400, ErrorCode.BAD_REQUEST, "start and end date query parameters are required (YYYY-MM-DD).");
         }
 
-        const startDate = new Date(`${start}T00:00:00`);
-        const endDate = new Date(`${end}T23:59:59.999`);
+        const startDate = new Date(`${start}T00:00:00.000Z`);
+        const endDate = new Date(`${end}T23:59:59.999Z`);
 
         const data = await this.financeService.getSummary(startDate, endDate);
 
@@ -34,8 +34,8 @@ export class FinanceController {
             throw new AppError(400, ErrorCode.BAD_REQUEST, "start and end date query parameters are required (YYYY-MM-DD).");
         }
 
-        const startDate = new Date(`${start}T00:00:00`);
-        const endDate = new Date(`${end}T23:59:59.999`);
+        const startDate = new Date(`${start}T00:00:00.000Z`);
+        const endDate = new Date(`${end}T23:59:59.999Z`);
 
         const data = await this.financeService.getDoctorPayments(staffId, startDate, endDate);
 
