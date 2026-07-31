@@ -2,6 +2,7 @@ import { PrismaClient } from "@generated/prisma/client";
 import { DoctorRepository } from "./doctor.repository";
 import { CreateDoctorDto } from "./doctor.dto";
 import { UpdateDoctorDto, DoctorAvailabilitySlotDto, DoctorLeaveDto } from "./doctor.schema";
+import { DoctorMapper } from "./doctor.mapper";
 import { AppError, ErrorCode } from "@errors";
 import { StaffRepository } from "@modules/staff/staff.repository";
 import { StaffRoleRepository } from "@modules/staff-role/staff-role.repository";
@@ -245,7 +246,8 @@ export class DoctorService {
     public async getDoctorAvailability(staffId: number) {
         const doctor = await this.getDoctorById(staffId);
         if (!doctor) throw new AppError(404, ErrorCode.NOT_FOUND, "Doctor not found.");
-        return this.doctorRepository.getDoctorAvailability(staffId);
+        const availability = await this.doctorRepository.getDoctorAvailability(staffId);
+        return DoctorMapper.toAvailabilityListDto(availability);
     }
 
     public async getEffectiveSchedule(staffId: number, startDate: string, endDate: string) {
@@ -412,11 +414,13 @@ export class DoctorService {
     public async createDoctorAvailability(staffId: number, slot: DoctorAvailabilitySlotDto) {
         const doctor = await this.getDoctorById(staffId);
         if (!doctor) throw new AppError(404, ErrorCode.NOT_FOUND, "Doctor not found.");
-        return this.doctorRepository.createDoctorAvailability(staffId, slot);
+        const created = await this.doctorRepository.createDoctorAvailability(staffId, slot);
+        return DoctorMapper.toAvailabilityDto(created);
     }
 
     public async updateDoctorAvailability(slotId: number, slot: DoctorAvailabilitySlotDto) {
-        return this.doctorRepository.updateDoctorAvailability(slotId, slot);
+        const updated = await this.doctorRepository.updateDoctorAvailability(slotId, slot);
+        return DoctorMapper.toAvailabilityDto(updated);
     }
 
     public async deleteDoctorAvailability(slotId: number) {
@@ -426,17 +430,27 @@ export class DoctorService {
     public async getDoctorLeaves(staffId: number) {
         const doctor = await this.getDoctorById(staffId);
         if (!doctor) throw new AppError(404, ErrorCode.NOT_FOUND, "Doctor not found.");
-        return this.doctorRepository.getDoctorLeaves(staffId);
+        const [leaves, slots] = await Promise.all([
+            this.doctorRepository.getDoctorLeaves(staffId),
+            this.doctorRepository.getDoctorAvailability(staffId)
+        ]);
+        return DoctorMapper.toLeaveListDto(leaves, slots);
     }
 
     public async createDoctorLeave(staffId: number, leave: DoctorLeaveDto) {
         const doctor = await this.getDoctorById(staffId);
         if (!doctor) throw new AppError(404, ErrorCode.NOT_FOUND, "Doctor not found.");
-        return this.doctorRepository.createDoctorLeave(staffId, leave);
+        const created = await this.doctorRepository.createDoctorLeave(staffId, leave);
+        const slots = await this.doctorRepository.getDoctorAvailability(staffId);
+        const linkedSlot = slots.find(s => s.doctor_availability_id === created.doctor_availability_id);
+        return DoctorMapper.toLeaveDto(created, linkedSlot);
     }
 
     public async updateDoctorLeave(leaveId: number, leave: DoctorLeaveDto) {
-        return this.doctorRepository.updateDoctorLeave(leaveId, leave);
+        const updated = await this.doctorRepository.updateDoctorLeave(leaveId, leave);
+        const slots = await this.doctorRepository.getDoctorAvailability(updated.doctor_staff_id);
+        const linkedSlot = slots.find(s => s.doctor_availability_id === updated.doctor_availability_id);
+        return DoctorMapper.toLeaveDto(updated, linkedSlot);
     }
 
     public async deleteDoctorLeave(leaveId: number) {
