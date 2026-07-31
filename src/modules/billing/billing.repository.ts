@@ -128,6 +128,9 @@ export class BillingRepository {
                 where: { appointment_id: appointmentId }
             });
             if (!appointment) throw new AppError(404, ErrorCode.NOT_FOUND, "Appointment not found");
+            if (![5, 12, 13].includes(appointment.appointment_status_id)) {
+                throw new AppError(400, ErrorCode.BAD_REQUEST, "Tests can only be sent while the patient is checked-in, in consultation, or awaiting reports.");
+            }
 
             const activeTests = await tx.testCatalog.findMany({
                 where: { test_catalog_id: { in: testCatalogIds }, is_active: true, deleted_at: null }

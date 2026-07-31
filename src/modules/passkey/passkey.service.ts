@@ -211,4 +211,14 @@ export class PasskeyService {
         await this.passkeyRepository.updatePasskeyName(credentialId, name.trim(), staffId);
         return { success: true };
     }
+
+    public async deletePasskey(staffId: number, credentialId: string) {
+        const passkey = await this.passkeyRepository.findPasskeyByCredentialId(credentialId);
+        if (!passkey || passkey.staff_id !== staffId) {
+            throw new AppError(404, ErrorCode.NOT_FOUND, "Passkey not found");
+        }
+
+        await this.passkeyRepository.deletePasskeyByCredentialId(credentialId, staffId);
+        return { success: true };
+    }
 }

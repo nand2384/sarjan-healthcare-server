@@ -4,6 +4,7 @@ import { ReceptionistMapper } from "./receptionist.mapper";
 import { BillingRepository } from "@modules/billing/billing.repository";
 import { BillingService } from "@modules/billing/billing.service";
 import { CheckoutPaymentMethod } from "@modules/billing/billing.dto";
+import { WebSocketPublisher } from "websocket";
 
 type AuditContext = { performed_by_staff_id: number; ip_address?: string; user_agent?: string };
 
@@ -62,7 +63,11 @@ export class ReceptionistService {
     }
 
     public async checkInPatient(appointmentId: number, createdByStaffId: number) {
-        return this.receptionistRepository.checkInPatientTx(appointmentId, createdByStaffId);
+        const result = await this.receptionistRepository.checkInPatientTx(appointmentId, createdByStaffId);
+
+        WebSocketPublisher.queueUpdated({ appointmentId }, createdByStaffId, result.appointment.doctor_staff_id);
+
+        return result;
     }
 
     public async updateAppointmentStatus(appointmentId: number, statusName: string, staffId: number) {

@@ -49,10 +49,14 @@ export const resetPasswordCompleteSchema = z.object({
     staff_id: z.number(),
     resetToken: z.string().trim(),
     password: z.string().trim().min(8, "Password is required"),
-    confirmPassword: z.string().trim().min(8, "Confirm password is required"),
-}).refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
+});
+
+export const requestEmailChangeSchema = z.object({
+    newEmail: z.string().email("Invalid email address"),
+});
+
+export const confirmEmailChangeSchema = z.object({
+    token: z.string().trim(),
 });
 
 export type LoginSchema = z.infer<typeof loginSchema>;

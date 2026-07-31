@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 
 import { AppError, ErrorCode } from "@errors";
 import { AuthRepository } from "./auth.repository";
@@ -276,7 +277,7 @@ export class AuthService {
             return { success: true, message: "If an account exists with that email, you will receive password reset instructions." };
         }
 
-        const resetToken = require('crypto').randomBytes(32).toString('hex');
+        const resetToken = crypto.randomBytes(32).toString('hex');
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
 
         await this.authRepository.setPasswordResetToken(staff.staff_id, resetToken, expiresAt);
@@ -327,6 +328,14 @@ export class AuthService {
             throw new AppError(401, ErrorCode.INVALID_RESET_TOKEN, "Password reset link has expired");
         }
 
+        // Validate that new password is different from current password
+        if (staff.password_hash) {
+            const isSamePassword = await bcrypt.compare(newPassword, staff.password_hash);
+            if (isSamePassword) {
+                throw new AppError(400, ErrorCode.BAD_REQUEST, "New password cannot be the same as your current password");
+            }
+        }
+
         const hashedPassword = await bcrypt.hash(newPassword, 10);
 
         await this.authRepository.completePasswordReset(staffId, hashedPassword);
@@ -344,7 +353,7 @@ export class AuthService {
             throw new AppError(404, ErrorCode.ACCOUNT_NOT_FOUND, "Staff not found");
         }
 
-        const resetToken = require('crypto').randomBytes(32).toString('hex');
+        const resetToken = crypto.randomBytes(32).toString('hex');
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
         await this.authRepository.setPasswordResetToken(staffId, resetToken, expiresAt);
@@ -363,5 +372,64 @@ export class AuthService {
         }
 
         return { success: true, message: "Password reset email sent successfully" };
+    }
+
+    public async requestEmailChange(staffId: number, newEmail: string) {
+        const staff = await this.authRepository.findStaffById(staffId);
+        if (!staff) {
+            throw new AppError(404, ErrorCode.ACCOUNT_NOT_FOUND, "Staff account not found");
+        }
+
+        // Check if email is already in use
+        const existingByEmail = await this.authRepository.findStaffByEmailExcluding(newEmail, staffId);
+        if (existingByEmail) {
+            throw new AppError(400, ErrorCode.EMAIL_ALREADY_IN_USE, "This email is already in use");
+        }
+
+        // Check if email is pending on another account
+        const existingByPendingEmail = await this.authRepository.findStaffByPendingEmailExcluding(newEmail, staffId);
+        if (existingByPendingEmail) {
+            throw new AppError(400, ErrorCode.EMAIL_ALREADY_IN_USE, "This email is pending verification on another account");
+        }
+
+        const emailToken = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+        await this.authRepository.setPendingEmail(staffId, newEmail, emailToken, expiresAt);
+
+        const confirmLink = `${env.FRONTEND_URL}/confirm-email-change?token=${emailToken}`;
+
+        try {
+            await this.mailerService.sendEmailChangeConfirmationMail({
+                to: newEmail,
+                firstName: staff.first_name,
+                username: staff.username,
+                confirmLink,
+            });
+        } catch (error) {
+            logger.error({ err: error }, `Failed to send email change confirmation for staff ${staffId}`);
+        }
+
+        return { success: true, message: "Verification email sent to your new address. Please check your inbox." };
+    }
+
+    public async confirmEmailChange(emailToken: string) {
+        const staff = await this.authRepository.getStaffByPendingEmailToken(emailToken);
+
+        if (!staff) {
+            throw new AppError(401, ErrorCode.INVALID_EMAIL_CHANGE_TOKEN, "Invalid email change link");
+        }
+
+        if (!staff.pending_email_token_expires_at || staff.pending_email_token_expires_at < new Date()) {
+            throw new AppError(401, ErrorCode.INVALID_EMAIL_CHANGE_TOKEN, "Email change link has expired");
+        }
+
+        if (!staff.pending_email) {
+            throw new AppError(400, ErrorCode.BAD_REQUEST, "No pending email to confirm");
+        }
+
+        await this.authRepository.confirmPendingEmail(staff.staff_id, staff.pending_email);
+
+        return { success: true, message: "Email updated successfully" };
     }
 }

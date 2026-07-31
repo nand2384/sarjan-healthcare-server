@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import { AuditAction, AuditEntityType, PrismaClient } from "@generated/prisma/client";
+import { AuditAction, AuditEntityType, Prisma, PrismaClient } from "@generated/prisma/client";
 
 import { env } from "@config";
 
@@ -18,6 +18,7 @@ import { StaffMapper } from "./staff.mapper";
 import { UpdateStaffDto } from "./staff.schema";
 import { StaffListEntity } from "./staff.types";
 import { AuthService } from "@modules/auth/auth.service";
+import { NotificationService } from "@modules/notification/notification.service";
 
 export class StaffService {
     constructor(
@@ -28,7 +29,19 @@ export class StaffService {
         private readonly auditService: AuditService,
         private readonly mailerService: MailerService,
         private readonly authService: AuthService,
+        private readonly notificationService: NotificationService,
     ) {}
+
+    /** Notifies other active admins (excluding the actor) inside an open transaction. Caller must ping post-commit. */
+    private async notifyOtherAdmins(
+        excludingStaffId: number,
+        data: { title: string; message: string; type: string; action_url?: string },
+        tx: Prisma.TransactionClient,
+    ) {
+        const adminIds = await this.staffRepository.getActiveAdminIds(excludingStaffId, tx);
+        await Promise.all(adminIds.map((adminId) => this.notificationService.notify(adminId, data, tx)));
+        return adminIds;
+    }
 
     public async createStaff(dto: CreateStaffDto, auditContext: { performed_by_staff_id: number, ip_address: string, user_agent: string }) {
         const {
@@ -253,6 +266,8 @@ export class StaffService {
     }
 
     public async disableStaff(staffId: number, auditContext: { performed_by_staff_id: number, ip_address: string, user_agent: string }): Promise<StaffListEntity> {
+        let notifiedAdminIds: number[] = [];
+
         const data = await this.prisma.$transaction(async (tx) => {
             const staff = await this.staffRepository.disable(staffId, tx);
 
@@ -265,14 +280,24 @@ export class StaffService {
                 new_values: { is_disabled: true },
             }, tx);
 
+            notifiedAdminIds = await this.notifyOtherAdmins(auditContext.performed_by_staff_id, {
+                title: "Staff account disabled",
+                message: `${staff.first_name} ${staff.last_name}'s account was disabled.`,
+                type: "WARNING",
+            }, tx);
+
             return staff;
 
         });
+
+        notifiedAdminIds.forEach((adminId) => this.notificationService.pingNew(adminId));
 
         return data;
     }
 
     public async restoreStaff(staffId: number, auditContext: { performed_by_staff_id: number, ip_address: string, user_agent: string }): Promise<StaffListEntity> {
+        let notifiedAdminIds: number[] = [];
+
         const data = await this.prisma.$transaction(async (tx) => {
             const staff = await this.staffRepository.restore(staffId, tx);
 
@@ -285,9 +310,17 @@ export class StaffService {
                 new_values: { is_disabled: false },
             }, tx);
 
+            notifiedAdminIds = await this.notifyOtherAdmins(auditContext.performed_by_staff_id, {
+                title: "Staff account restored",
+                message: `${staff.first_name} ${staff.last_name}'s account was restored.`,
+                type: "SUCCESS",
+            }, tx);
+
             return staff;
 
         });
+
+        notifiedAdminIds.forEach((adminId) => this.notificationService.pingNew(adminId));
 
         return data;
     }

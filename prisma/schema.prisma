@@ -181,6 +181,10 @@ model Staff {
   password_reset_token            String?   @unique
   password_reset_token_expires_at DateTime?
 
+  pending_email                    String?
+  pending_email_token              String?   @unique
+  pending_email_token_expires_at   DateTime?
+
   current_challenge    String?
   challenge_created_at DateTime?
 

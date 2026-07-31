@@ -22,3 +22,10 @@ export interface SendPasswordResetMailOptions {
     username: string;
     resetLink: string;
 }
+
+export interface SendEmailChangeConfirmationMailOptions {
+    to: string;
+    firstName: string;
+    username: string;
+    confirmLink: string;
+}

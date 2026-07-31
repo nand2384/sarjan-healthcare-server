@@ -32,4 +32,13 @@ export class WebSocketPublisher {
         }
         */
     }
+
+    /**
+     * Pings a staff member that a new visible notification exists for them.
+     * Payload is intentionally empty — the client refetches from the DB,
+     * which remains the source of truth.
+     */
+    static notificationCreated(staffId: number): void {
+        getWebSocketService().emitToStaff(staffId, SocketEvent.NOTIFICATION_NEW, {});
+    }
 }

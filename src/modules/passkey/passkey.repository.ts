@@ -110,7 +110,7 @@ export class PasskeyRepository {
 
     public async updatePasskeyName(credentialId: string, deviceName: string, staffId: number) {
         await this.prisma.passkeyCredential.updateMany({
-            where: { 
+            where: {
                 credential_id: credentialId,
                 staff_id: staffId
             },
@@ -119,5 +119,14 @@ export class PasskeyRepository {
             }
         });
         return this.findPasskeyByCredentialId(credentialId);
+    }
+
+    public async deletePasskeyByCredentialId(credentialId: string, staffId: number) {
+        return await this.prisma.passkeyCredential.deleteMany({
+            where: {
+                credential_id: credentialId,
+                staff_id: staffId,
+            },
+        });
     }
 }

@@ -1,8 +1,8 @@
 import { env } from "@config";
 
 import { mailTransporter } from "./mailer.provider";
-import { staffActivationTemplate, doctorFeeMissingTemplate, passwordResetTemplate } from "./mailer.templates";
-import { SendMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions, SendPasswordResetMailOptions } from "./mailer.types";
+import { staffActivationTemplate, doctorFeeMissingTemplate, passwordResetTemplate, emailChangeConfirmationTemplate } from "./mailer.templates";
+import { SendMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions, SendPasswordResetMailOptions, SendEmailChangeConfirmationMailOptions } from "./mailer.types";
 
 export class MailerService {
     async send({ to, subject, html }: SendMailOptions): Promise<void> {
@@ -52,6 +52,23 @@ export class MailerService {
                 firstName,
                 username,
                 resetLink,
+            }),
+        });
+    }
+
+    async sendEmailChangeConfirmationMail({
+        to,
+        firstName,
+        username,
+        confirmLink,
+    }: SendEmailChangeConfirmationMailOptions): Promise<void> {
+        await this.send({
+            to,
+            subject: "Confirm your new Sarjan Healthcare email address",
+            html: emailChangeConfirmationTemplate({
+                firstName,
+                username,
+                confirmLink,
             }),
         });
     }

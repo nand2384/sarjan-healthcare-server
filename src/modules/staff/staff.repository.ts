@@ -270,4 +270,20 @@ export class StaffRepository {
             },
         });
     }
+
+    public async getActiveAdminIds(excludingStaffId?: number, tx?: Prisma.TransactionClient) {
+        const db = tx ?? this.prisma;
+
+        const admins = await db.staff.findMany({
+            where: {
+                deleted_at: null,
+                is_disabled: false,
+                staff_roles: { some: { role_id: USER_ROLE_ID.ADMIN } },
+                ...(excludingStaffId ? { staff_id: { not: excludingStaffId } } : {}),
+            },
+            select: { staff_id: true },
+        });
+
+        return admins.map((admin) => admin.staff_id);
+    }
 }

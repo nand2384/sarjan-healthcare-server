@@ -16,6 +16,13 @@ notificationRouter.get(
     notificationController.getNotifications,
 );
 
+notificationRouter.get(
+    "/unread-count",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    notificationController.getUnreadCount,
+);
+
 notificationRouter.patch(
     "/:id/read",
     authMiddleware,

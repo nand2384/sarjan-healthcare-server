@@ -215,3 +215,46 @@ export function passwordResetTemplate({
 `,
     });
 }
+
+interface EmailChangeConfirmationTemplateOptions {
+    firstName: string;
+    username: string;
+    confirmLink: string;
+}
+
+export function emailChangeConfirmationTemplate({
+    firstName,
+    username,
+    confirmLink,
+}: EmailChangeConfirmationTemplateOptions): string {
+    return emailLayout({
+        title: "Confirm your new Sarjan Healthcare email address",
+        heading: `Confirm email change, ${firstName}`,
+        content: `
+<p style="margin-top: 0; margin-bottom: 16px;">We received a request to change the email address associated with your Sarjan Healthcare account.</p>
+
+<p style="margin-top: 0; margin-bottom: 16px;">Your login username is: <strong style="color: #0F172A; background-color: #F1F5F9; padding: 2px 8px; border-radius: 4px; font-family: monospace;">${username}</strong></p>
+
+<p style="margin-top: 0; margin-bottom: 24px;">Click the button below to verify this new email address and complete the update. This link will expire in 24 hours.</p>
+
+<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
+  <tr>
+    <td>
+      <table border="0" cellspacing="0" cellpadding="0">
+        <tr>
+          <td align="center" style="border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" bgcolor="#138B78">
+            <a href="${confirmLink}" target="_blank" style="font-size: 15px; font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #ffffff; text-decoration: none; border-radius: 8px; padding: 12px 24px; display: inline-block; font-weight: 600;">Confirm Email Address</a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<p style="margin-top: 0; margin-bottom: 16px; font-size: 14px;">For security reasons, this confirmation link will expire in 24 hours.</p>
+
+<p style="margin-top: 0; margin-bottom: 0; font-size: 14px; color: #A0AAB5;">If you did not request to change your email address or believe it was sent in error, you can safely ignore this email. Your current email address will remain unchanged.</p>
+`,
+    });
+}
+

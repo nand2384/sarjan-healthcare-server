@@ -15,3 +15,4 @@ passkeyRouter.post("/login/verify", passkeyController.verifyAuthentication);
 
 passkeyRouter.get("/list", authMiddleware, passkeyController.getPasskeys);
 passkeyRouter.patch("/:id/name", authMiddleware, passkeyController.updatePasskeyName);
+passkeyRouter.delete("/:id", authMiddleware, passkeyController.deletePasskey);

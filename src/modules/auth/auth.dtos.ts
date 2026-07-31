@@ -102,6 +102,7 @@ export interface GetProfileDetailDto {
         email: string;
         mobile_number: string;
         roles: string[];
+        pending_email?: string;
     }
 }
 
@@ -120,4 +121,23 @@ export interface UpdateProfileResponseDto {
         email: string;
         mobile_number: string;
     }
+}
+
+export interface RequestEmailChangeRequestDto {
+    newEmail: string;
+}
+
+export type RequestEmailChangeResponseDto = {
+    success: boolean;
+    message: string;
+}
+
+export interface ConfirmEmailChangeRequestDto {
+    staff_id: number;
+    token: string;
+}
+
+export type ConfirmEmailChangeResponseDto = {
+    success: boolean;
+    message: string;
 }

@@ -185,4 +185,24 @@ export class AuthController {
             message: response.message,
         });
     }
+
+    public async requestEmailChange(req: Request, res: Response) {
+        const { newEmail } = req.body;
+        const response = await this.authService.requestEmailChange(req.session.staff_id, newEmail);
+
+        return res.status(200).json({
+            success: response.success,
+            message: response.message,
+        });
+    }
+
+    public async confirmEmailChange(req: Request, res: Response) {
+        const { token } = req.body;
+        const response = await this.authService.confirmEmailChange(token);
+
+        return res.status(200).json({
+            success: response.success,
+            message: response.message,
+        });
+    }
 }

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { AuthController } from "./auth.controller";
 import { appContext } from "app.context";
-import { activationCompleteSchema, activationVerifySchema, changePasswordSchema, forgotPasswordSchema, loginSchema, resendActivationScham, resetPasswordCompleteSchema, resetPasswordVerifySchema, updateProfileSchema } from "./auth.schema";
+import { activationCompleteSchema, activationVerifySchema, changePasswordSchema, confirmEmailChangeSchema, forgotPasswordSchema, loginSchema, requestEmailChangeSchema, resendActivationScham, resetPasswordCompleteSchema, resetPasswordVerifySchema, updateProfileSchema } from "./auth.schema";
 import { authMiddleware, roleMiddleware, validate, authRateLimiter } from "@middleware";
 import { USER_ROLE } from "common/common.schema";
 
@@ -92,4 +92,16 @@ authRouter.post("/password/reset/complete",
     authRateLimiter,
     validate(resetPasswordCompleteSchema),
     authController.completePasswordReset.bind(authController)
+);
+
+authRouter.post("/email/change",
+    authMiddleware,
+    validate(requestEmailChangeSchema),
+    authController.requestEmailChange.bind(authController)
+);
+
+authRouter.post("/email/change/confirm",
+    authRateLimiter,
+    validate(confirmEmailChangeSchema),
+    authController.confirmEmailChange.bind(authController)
 );

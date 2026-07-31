@@ -126,4 +126,19 @@ export class PasskeyController {
             next(error);
         }
     }
+
+    public deletePasskey = async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+        try {
+            const staffId = (req as any).session.staff_id;
+            const { id } = req.params;
+            const result = await this.passkeyService.deletePasskey(staffId, id);
+            return res.status(200).json({
+                success: true,
+                message: "Passkey revoked successfully.",
+                data: result,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 }

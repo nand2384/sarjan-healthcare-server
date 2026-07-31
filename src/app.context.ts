@@ -46,8 +46,11 @@ const staffRoleRepository = new StaffRoleRepository(prisma);
 const masterRepository = new MasterRepository(prisma);
 const masterService = new MasterService(masterRepository, redisClient, auditService);
 
+const notificationRepository = new NotificationRepository(prisma);
+const notificationService = new NotificationService(notificationRepository);
+
 const staffRepository = new StaffRepository(prisma);
-const staffService = new StaffService(prisma, staffRepository, staffRoleRepository, masterRepository, auditService, mailerService, authService);
+const staffService = new StaffService(prisma, staffRepository, staffRoleRepository, masterRepository, auditService, mailerService, authService, notificationService);
 
 const doctorRepository = new DoctorRepository(prisma);
 const doctorService = new DoctorService(prisma, doctorRepository, staffRepository, staffRoleRepository, auditService, mailerService);
@@ -63,9 +66,6 @@ const billingService = new BillingService(billingRepository, auditService, maile
 
 const receptionistRepository = new ReceptionistRepository(prisma);
 const receptionistService = new ReceptionistService(receptionistRepository, billingRepository, billingService);
-
-const notificationRepository = new NotificationRepository(prisma);
-const notificationService = new NotificationService(notificationRepository);
 
 const financeRepository = new FinanceRepository(prisma);
 const financeService = new FinanceService(financeRepository);

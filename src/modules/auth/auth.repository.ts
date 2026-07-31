@@ -140,6 +140,7 @@ export class AuthRepository {
                 mobile_number: true,
                 is_disabled: true,
                 deleted_at: true,
+                pending_email: true,
             },
         });
     }
@@ -199,6 +200,7 @@ export class AuthRepository {
                 staff_id: true,
                 first_name: true,
                 username: true,
+                password_hash: true,
                 password_reset_token: true,
                 password_reset_token_expires_at: true,
             }
@@ -238,6 +240,68 @@ export class AuthRepository {
                 first_name: true,
                 username: true,
             }
+        });
+    }
+
+    public async findStaffByEmailExcluding(email: string, staffId: number) {
+        return await this.prisma.staff.findFirst({
+            where: {
+                email,
+                staff_id: { not: staffId },
+                deleted_at: null,
+            },
+            select: { staff_id: true },
+        });
+    }
+
+    public async findStaffByPendingEmailExcluding(email: string, staffId: number) {
+        return await this.prisma.staff.findFirst({
+            where: {
+                pending_email: email,
+                staff_id: { not: staffId },
+                deleted_at: null,
+            },
+            select: { staff_id: true },
+        });
+    }
+
+    public async setPendingEmail(staffId: number, newEmail: string, token: string, expiresAt: Date) {
+        return await this.prisma.staff.update({
+            where: { staff_id: staffId },
+            data: {
+                pending_email: newEmail,
+                pending_email_token: token,
+                pending_email_token_expires_at: expiresAt,
+            },
+        });
+    }
+
+    public async getStaffByPendingEmailToken(token: string) {
+        return await this.prisma.staff.findUnique({
+            where: { pending_email_token: token },
+            select: {
+                staff_id: true,
+                email: true,
+                pending_email: true,
+                pending_email_token: true,
+                pending_email_token_expires_at: true,
+            },
+        });
+    }
+
+    public async confirmPendingEmail(staffId: number, newEmail: string) {
+        return await this.prisma.staff.update({
+            where: { staff_id: staffId },
+            data: {
+                email: newEmail,
+                pending_email: null,
+                pending_email_token: null,
+                pending_email_token_expires_at: null,
+            },
+            select: {
+                staff_id: true,
+                email: true,
+            },
         });
     }
 }
