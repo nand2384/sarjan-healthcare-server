@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { PatientService } from "./patient.service";
 import { RegisterAndBookRequestDto } from "./patient.dtos";
 import { AppError, ErrorCode } from "@errors";
+import { WebSocketPublisher } from "websocket";
 
 export class PatientController {
     constructor(private readonly patientService: PatientService) {}
@@ -65,6 +66,8 @@ export class PatientController {
         }
 
         const result = await this.patientService.updatePatientProfile(patientId, payload);
+
+        WebSocketPublisher.queueUpdated({ patientId }, staffId);
 
         res.status(200).json({
             message: "Patient profile updated successfully",

@@ -15,6 +15,7 @@ export const registerAndBookSchema = z.object({
     city: z.string().trim().optional(),
     state: z.string().trim().optional(),
     pincode: z.string().regex(/^\d{6}$/, "Pincode must be exactly 6 digits").optional().or(z.literal('')),
+    referred_by: z.string().trim().optional().or(z.literal('')),
     is_account_complete: z.boolean(),
 
     mode: z.literal('call').or(z.literal('walk-in')),
@@ -45,6 +46,7 @@ export const registerWalkInSchema = z.object({
     city: z.string().trim().optional(),
     state: z.string().trim().optional(),
     pincode: z.string().regex(/^\d{6}$/, "Pincode must be exactly 6 digits").optional().or(z.literal('')),
+    referred_by: z.string().trim().optional().or(z.literal('')),
     is_account_complete: z.boolean(),
 
     mode: z.literal('walk-in'),

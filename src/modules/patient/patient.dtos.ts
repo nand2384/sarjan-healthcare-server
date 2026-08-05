@@ -15,6 +15,7 @@ export interface RegisterAndBookResponseDto {
     appointment_id: number;
     appointment_status_id: number;
     queue_number: number | null;
+    whatsapp_verified: boolean;
 }
 
 export interface PatientSearchItemDto {
@@ -24,6 +25,9 @@ export interface PatientSearchItemDto {
     middle_name?: string | null;
     last_name: string;
     mobile_number: string;
+    whatsapp_number?: string | null;
+    whatsapp_verified: boolean;
+    referred_by?: string | null;
     gender: string;
     age: number;
     is_account_complete: boolean;

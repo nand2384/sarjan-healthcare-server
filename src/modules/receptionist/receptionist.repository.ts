@@ -1,5 +1,7 @@
 import { PrismaClient, QueueType } from "@generated/prisma/client";
 import { AppError, ErrorCode } from "@errors";
+import { logger } from "@logger";
+import { cancelReminder } from "../../queues/reminder.queue";
 
 export interface AppointmentHistoryFilters {
     startDate: Date;
@@ -123,6 +125,7 @@ export class ReceptionistRepository {
                         middle_name: true,
                         last_name: true,
                         mobile_number: true,
+                        whatsapp_number: true,
                         is_account_complete: true,
                     }
                 },
@@ -130,6 +133,7 @@ export class ReceptionistRepository {
                     select: {
                         first_name: true,
                         last_name: true,
+                        email: true,
                     }
                 },
                 visit_reason: { select: { value_name: true } },
@@ -312,6 +316,13 @@ export class ReceptionistRepository {
                 });
             }
 
+            return updatedAppt;
+        }).then(async (updatedAppt) => {
+            if (targetStatusId === 7) {
+                await cancelReminder(appointmentId).catch((error) =>
+                    logger.error({ err: error, appointmentId }, "Failed to cancel appointment reminder job")
+                );
+            }
             return updatedAppt;
         });
     }

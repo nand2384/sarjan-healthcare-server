@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { DoctorService } from "./doctor.service";
 import { CreateDoctorResponseDto } from "./doctor.dto";
+import { WebSocketPublisher } from "websocket";
 
 export class DoctorController {
     constructor(private readonly doctorService: DoctorService) {}
@@ -95,27 +96,36 @@ export class DoctorController {
     public createDoctorAvailability = async (req: Request, res: Response) => {
         const staffId = Number(req.params.id);
         const slot = await this.doctorService.createDoctorAvailability(staffId, req.body);
-        
+
+        const actorStaffId = req.session?.staff_id;
+        if (actorStaffId) WebSocketPublisher.scheduleUpdated(staffId, actorStaffId);
+
         return res.status(201).json({
             message: "Doctor availability created successfully.",
             data: slot,
         });
     };
-    
+
     public updateDoctorAvailability = async (req: Request, res: Response) => {
         const slotId = Number(req.params.slotId);
         const slot = await this.doctorService.updateDoctorAvailability(slotId, req.body);
-        
+
+        const actorStaffId = req.session?.staff_id;
+        if (actorStaffId) WebSocketPublisher.scheduleUpdated(slot.doctor_staff_id, actorStaffId);
+
         return res.status(200).json({
             message: "Doctor availability updated successfully.",
             data: slot,
         });
     };
-    
+
     public deleteDoctorAvailability = async (req: Request, res: Response) => {
         const slotId = Number(req.params.slotId);
-        await this.doctorService.deleteDoctorAvailability(slotId);
-        
+        const deleted = await this.doctorService.deleteDoctorAvailability(slotId);
+
+        const actorStaffId = req.session?.staff_id;
+        if (actorStaffId) WebSocketPublisher.scheduleUpdated(deleted.doctor_staff_id, actorStaffId);
+
         return res.status(200).json({
             message: "Doctor availability deleted successfully.",
         });
@@ -134,27 +144,36 @@ export class DoctorController {
     public createDoctorLeave = async (req: Request, res: Response) => {
         const staffId = Number(req.params.id);
         const leave = await this.doctorService.createDoctorLeave(staffId, req.body);
-        
+
+        const actorStaffId = req.session?.staff_id;
+        if (actorStaffId) WebSocketPublisher.scheduleUpdated(staffId, actorStaffId);
+
         return res.status(201).json({
             message: "Doctor leave created successfully.",
             data: leave,
         });
     };
-    
+
     public updateDoctorLeave = async (req: Request, res: Response) => {
         const leaveId = Number(req.params.leaveId);
         const leave = await this.doctorService.updateDoctorLeave(leaveId, req.body);
-        
+
+        const actorStaffId = req.session?.staff_id;
+        if (actorStaffId) WebSocketPublisher.scheduleUpdated(leave.doctor_staff_id, actorStaffId);
+
         return res.status(200).json({
             message: "Doctor leave updated successfully.",
             data: leave,
         });
     };
-    
+
     public deleteDoctorLeave = async (req: Request, res: Response) => {
         const leaveId = Number(req.params.leaveId);
-        await this.doctorService.deleteDoctorLeave(leaveId);
-        
+        const deleted = await this.doctorService.deleteDoctorLeave(leaveId);
+
+        const actorStaffId = req.session?.staff_id;
+        if (actorStaffId) WebSocketPublisher.scheduleUpdated(deleted.doctor_staff_id, actorStaffId);
+
         return res.status(200).json({
             message: "Doctor leave deleted successfully.",
         });

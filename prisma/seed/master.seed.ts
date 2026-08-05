@@ -27,6 +27,11 @@ export async function seedMaster() {
                     description: "Pharmacist",
                     display_order: 4,
                 },
+                {
+                    role_name: "Developer",
+                    description: "Developer",
+                    display_order: 5,
+                },
             ],
             skipDuplicates: true,
         });

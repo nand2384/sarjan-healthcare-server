@@ -54,6 +54,7 @@ export class PatientMapper {
             appointment_id: appointment.appointment_id,
             appointment_status_id: appointment.appointment_status_id,
             queue_number: queue ? queue.queue_number : null,
+            whatsapp_verified: !!patient.whatsapp_verified_at,
         };
     }
 
@@ -140,6 +141,8 @@ export class PatientMapper {
                     last_name: p.last_name,
                     mobile_number: p.mobile_number,
                     whatsapp_number: p.whatsapp_number || p.mobile_number,
+                    whatsapp_verified: !!p.whatsapp_verified_at,
+                    referred_by: p.referred_by || null,
                     email: p.email || "Not Specified",
                     gender: p.gender?.value_name || p.gender || "N/A",
                     age,

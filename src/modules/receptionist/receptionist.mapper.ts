@@ -33,7 +33,7 @@ export class ReceptionistMapper {
         return `${formattedHours}:${minutes} ${ampm}`;
     }
 
-    public static toAppointmentDto(appt: any): AppointmentDto {
+    public static toAppointmentDto(appt: any, walkInPriorityThreshold?: number): AppointmentDto {
         const rawStatus = appt.appointment_status?.value_name || 'BOOKED';
         const statusName = rawStatus.toUpperCase().replace(/ /g, '_');
         const isArrived = statusName !== 'BOOKED';
@@ -84,16 +84,16 @@ export class ReceptionistMapper {
                 queue_type: appt.queue.queue_type,
                 created_at: appt.queue.joined_queue_at,
             } : undefined,
-            is_priority: isPromotedWalkIn(appt),
+            is_priority: isPromotedWalkIn(appt, walkInPriorityThreshold),
             status_started_at: appt.appointment_workflow_history?.[0]?.created_at
                 ? new Date(appt.appointment_workflow_history[0].created_at).toISOString()
                 : undefined,
         };
     }
 
-    public static toDoctorDto(doc: any): DoctorDto {
+    public static toDoctorDto(doc: any, walkInPriorityThreshold?: number): DoctorDto {
         const orderedAppointments = doc.doctor_appointments
-            ? sortAppointmentsByQueuePriority(doc.doctor_appointments)
+            ? sortAppointmentsByQueuePriority(doc.doctor_appointments, walkInPriorityThreshold)
             : undefined;
 
         return {
@@ -105,15 +105,15 @@ export class ReceptionistMapper {
             waiting: orderedAppointments?.filter((a: any) => [5, 13, 14].includes(a.appointment_status_id)).length || 0, // CHECKED_IN, WAITING_REPORTS, AWAITING_PAYMENT
             completed: orderedAppointments?.filter((a: any) => a.appointment_status_id === 6).length || 0, // COMPLETED
             doctor_appointments: orderedAppointments
-                ? orderedAppointments.map((appt: any) => this.toAppointmentDto({ ...appt, doctor: doc, patient: appt.patient }))
+                ? orderedAppointments.map((appt: any) => this.toAppointmentDto({ ...appt, doctor: doc, patient: appt.patient }, walkInPriorityThreshold))
                 : undefined,
         };
     }
 
-    public static toDashboardResponse(doctors: any[], appointments: any[], stats?: any): DashboardResponseDto {
+    public static toDashboardResponse(doctors: any[], appointments: any[], stats?: any, walkInPriorityThreshold?: number): DashboardResponseDto {
         return {
-            doctors: doctors.map(doc => this.toDoctorDto(doc)),
-            upcomingAppointments: appointments.map(appt => this.toAppointmentDto(appt)),
+            doctors: doctors.map(doc => this.toDoctorDto(doc, walkInPriorityThreshold)),
+            upcomingAppointments: appointments.map(appt => this.toAppointmentDto(appt, walkInPriorityThreshold)),
             stats
         };
     }
@@ -148,14 +148,14 @@ export class ReceptionistMapper {
         };
     }
 
-    public static toDoctorDashboardResponse(doctor: any, appointments: any[]): DoctorDashboardResponseDto {
+    public static toDoctorDashboardResponse(doctor: any, appointments: any[], walkInPriorityThreshold?: number): DoctorDashboardResponseDto {
         const orderedAppointments = doctor?.doctor_appointments
-            ? sortAppointmentsByQueuePriority(doctor.doctor_appointments)
+            ? sortAppointmentsByQueuePriority(doctor.doctor_appointments, walkInPriorityThreshold)
             : [];
 
-        const advanceQueue = orderedAppointments.map((appt: any) => this.toAppointmentDto({ ...appt, doctor, patient: appt.patient }));
-            
-        const localAppointmentsData = appointments.map(appt => this.toAppointmentDto(appt));
+        const advanceQueue = orderedAppointments.map((appt: any) => this.toAppointmentDto({ ...appt, doctor, patient: appt.patient }, walkInPriorityThreshold));
+
+        const localAppointmentsData = appointments.map(appt => this.toAppointmentDto(appt, walkInPriorityThreshold));
 
         const activeAppointments = advanceQueue.map((appt: AppointmentDto) => this.toPatientQueueDtoFromAppt(appt));
         
@@ -174,7 +174,7 @@ export class ReceptionistMapper {
             .map((appt: AppointmentDto) => this.toPatientQueueDtoFromAppt(appt));
             
         return {
-            doctor: this.toDoctorDto(doctor),
+            doctor: this.toDoctorDto(doctor, walkInPriorityThreshold),
             currentlyConsulting,
             advanceBookingQueue,
             walkInBookingQueue,

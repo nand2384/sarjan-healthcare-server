@@ -41,6 +41,20 @@ export class PatientRepository {
         return lastQueue ? lastQueue.queue_number + 1 : 1;
     }
 
+    /** Minimal shape needed to enqueue/format an appointment reminder — see PatientService's booking-time hook. */
+    public async getAppointmentReminderContext(appointmentId: number) {
+        return this.prisma.appointment.findUnique({
+            where: { appointment_id: appointmentId },
+            select: {
+                appointment_id: true,
+                appointment_date: true,
+                patient: { select: { first_name: true, last_name: true, whatsapp_number: true } },
+                doctor: { select: { first_name: true, last_name: true } },
+                doctor_availability: { select: { start_time: true } },
+            },
+        });
+    }
+
     public async registerAndBookTx(
         patientData: Prisma.PatientCreateInput,
         appointmentData: any, // We pass foreign keys directly here

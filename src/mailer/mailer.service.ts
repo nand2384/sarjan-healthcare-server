@@ -1,8 +1,8 @@
 import { env } from "@config";
 
 import { mailTransporter } from "./mailer.provider";
-import { staffActivationTemplate, doctorFeeMissingTemplate, passwordResetTemplate, emailChangeConfirmationTemplate, announcementTemplate } from "./mailer.templates";
-import { SendMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions, SendPasswordResetMailOptions, SendEmailChangeConfirmationMailOptions, SendAnnouncementMailOptions } from "./mailer.types";
+import { staffActivationTemplate, doctorFeeMissingTemplate, passwordResetTemplate, emailChangeConfirmationTemplate, announcementTemplate, doctorShiftNoticeTemplate } from "./mailer.templates";
+import { SendMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions, SendPasswordResetMailOptions, SendEmailChangeConfirmationMailOptions, SendAnnouncementMailOptions, SendDoctorShiftNoticeMailOptions } from "./mailer.types";
 
 export class MailerService {
     async send({ to, subject, html }: SendMailOptions): Promise<void> {
@@ -88,6 +88,23 @@ export class MailerService {
                 firstName,
                 message,
                 type,
+            }),
+        });
+    }
+
+    async sendDoctorShiftNotice({
+        to,
+        firstName,
+        appointmentCount,
+        firstSlotTime,
+    }: SendDoctorShiftNoticeMailOptions): Promise<void> {
+        await this.send({
+            to,
+            subject: "Your Sarjan Healthcare shift notice for tomorrow",
+            html: doctorShiftNoticeTemplate({
+                firstName,
+                appointmentCount,
+                firstSlotTime,
             }),
         });
     }

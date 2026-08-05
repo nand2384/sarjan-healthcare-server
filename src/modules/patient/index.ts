@@ -4,3 +4,7 @@ export * from "./patient.service";
 export * from "./patient.repository";
 export * from "./patient.schema";
 export * from "./patient.dtos";
+export * from "./patient-otp.service";
+export * from "./patient-otp.repository";
+export * from "./patient-otp.controller";
+export * from "./patient-otp.schema";

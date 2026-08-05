@@ -1,13 +1,36 @@
 import { Router } from "express";
 import { appContext } from "../../app.context";
 import { PatientController } from "./patient.controller";
-import { authMiddleware, roleMiddleware, validate } from "@middleware";
+import { PatientOtpController } from "./patient-otp.controller";
+import { authMiddleware, roleMiddleware, validate, authRateLimiter } from "@middleware";
 import { USER_ROLE } from "common/common.schema";
 import { registerAndBookSchema, registerWalkInSchema, updateProfileSchema, bookAppointmentSchema } from "./patient.schema";
+import { sendPatientOtpSchema, verifyPatientOtpSchema } from "./patient-otp.schema";
 
 export const patientRouter = Router();
 
 const patientController = new PatientController(appContext.services.patientService);
+const patientOtpController = new PatientOtpController(appContext.services.patientOtpService);
+
+// POST /patients/otp/send
+patientRouter.post(
+    "/otp/send",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.RECEPTIONIST, USER_ROLE.ADMIN),
+    authRateLimiter,
+    validate(sendPatientOtpSchema),
+    patientOtpController.send.bind(patientOtpController)
+);
+
+// POST /patients/otp/verify
+patientRouter.post(
+    "/otp/verify",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.RECEPTIONIST, USER_ROLE.ADMIN),
+    authRateLimiter,
+    validate(verifyPatientOtpSchema),
+    patientOtpController.verify.bind(patientOtpController)
+);
 
 // GET /patients/search
 patientRouter.get(

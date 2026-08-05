@@ -11,6 +11,8 @@ import { notificationRouter } from "@modules/notification/notification.routes";
 import { billingRouter } from "@modules/billing/billing.routes";
 import { financeRouter } from "@modules/finance/finance.routes";
 import { announcementRouter } from "@modules/announcement/announcement.routes";
+import { systemSettingRouter } from "@modules/system-setting/system-setting.routes";
+import { reportRouter } from "@modules/report/report.routes";
 
 // Remove on removing redis/clear API
 import { env } from "node:process";
@@ -35,6 +37,8 @@ router.use("/notifications", notificationRouter);
 router.use("/billing", billingRouter);
 router.use("/admin/finance", financeRouter);
 router.use("/announcements", announcementRouter);
+router.use("/system-settings", systemSettingRouter);
+router.use("/reports", reportRouter);
 
 router.get("/dev/redis/clear", async (_req, res, next) => {
     try {

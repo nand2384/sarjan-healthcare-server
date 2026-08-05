@@ -3,6 +3,7 @@ import { redisClient } from "@cache";
 import { disconnectDatabase } from "./database";
 import { logger } from "./logger";
 import { getHttpServer } from "./server.instance";
+import { queueConnection } from "./queues/redis-connection";
 
 export async function shutdown(signal: string): Promise<void> {
     logger.info(`${signal} received. Shutting down application...`);
@@ -27,6 +28,7 @@ export async function shutdown(signal: string): Promise<void> {
 
         await disconnectDatabase();
         await redisClient.quit();
+        queueConnection.disconnect();
 
         logger.info("Disconnected from database");
 

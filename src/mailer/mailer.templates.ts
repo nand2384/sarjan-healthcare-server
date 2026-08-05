@@ -275,6 +275,25 @@ const ANNOUNCEMENT_THEME: Record<AnnouncementTemplateOptions["type"], { accentCo
     danger: { accentColor: "#EF4444", eyebrow: "URGENT", heading: "Urgent announcement" },
 };
 
+interface DoctorShiftNoticeTemplateOptions {
+    firstName: string;
+    appointmentCount: number;
+    firstSlotTime: string;
+}
+
+export function doctorShiftNoticeTemplate({ firstName, appointmentCount, firstSlotTime }: DoctorShiftNoticeTemplateOptions): string {
+    return emailLayout({
+        title: "Your Sarjan Healthcare shift notice",
+        heading: `Tomorrow's schedule, Dr. ${firstName}`,
+        eyebrow: "SHIFT NOTICE",
+        content: `
+<p style="margin-top: 0; margin-bottom: 16px;">You have <strong style="color: #0F172A;">${appointmentCount} booked appointment${appointmentCount === 1 ? "" : "s"}</strong> scheduled for tomorrow.</p>
+
+<p style="margin-top: 0; margin-bottom: 0;">Your first appointment is at <strong style="color: #0F172A; background-color: #F1F5F9; padding: 2px 8px; border-radius: 4px;">${firstSlotTime}</strong>.</p>
+`,
+    });
+}
+
 export function announcementTemplate({ firstName, message, type }: AnnouncementTemplateOptions): string {
     const theme = ANNOUNCEMENT_THEME[type];
 

@@ -19,6 +19,8 @@ import { PasskeyRepository } from "@modules/passkey/passkey.repository";
 import { PasskeyService } from "@modules/passkey/passkey.service";
 import { PatientRepository } from "@modules/patient/patient.repository";
 import { PatientService } from "@modules/patient/patient.service";
+import { PatientOtpRepository } from "@modules/patient/patient-otp.repository";
+import { PatientOtpService } from "@modules/patient/patient-otp.service";
 import { ReceptionistRepository } from "@modules/receptionist/receptionist.repository";
 import { ReceptionistService } from "@modules/receptionist/receptionist.service";
 import { NotificationRepository } from "@modules/notification/notification.repository";
@@ -29,11 +31,17 @@ import { FinanceRepository } from "@modules/finance/finance.repository";
 import { FinanceService } from "@modules/finance/finance.service";
 import { AnnouncementRepository } from "@modules/announcement/announcement.repository";
 import { AnnouncementService } from "@modules/announcement/announcement.service";
+import { SystemSettingRepository } from "@modules/system-setting/system-setting.repository";
+import { SystemSettingService } from "@modules/system-setting/system-setting.service";
+import { ReportRepository } from "@modules/report/report.repository";
+import { ReportService } from "@modules/report/report.service";
+import { WhatsAppService } from "whatsapp";
 
 const auditRepository = new AuditRepository(prisma);
 const auditService = new AuditService(auditRepository);
 
 const mailerService = new MailerService();
+const whatsAppService = new WhatsAppService();
 
 const sessionRepository = new SessionRepository(prisma);
 const sessionService = new SessionService(sessionRepository, redisClient);
@@ -57,8 +65,14 @@ const staffService = new StaffService(prisma, staffRepository, staffRoleReposito
 const doctorRepository = new DoctorRepository(prisma);
 const doctorService = new DoctorService(prisma, doctorRepository, staffRepository, staffRoleRepository, auditService, mailerService);
 
+const systemSettingRepository = new SystemSettingRepository(prisma);
+const systemSettingService = new SystemSettingService(systemSettingRepository, redisClient, auditService);
+
+const patientOtpRepository = new PatientOtpRepository(prisma);
+const patientOtpService = new PatientOtpService(patientOtpRepository, whatsAppService);
+
 const patientRepository = new PatientRepository(prisma);
-const patientService = new PatientService(patientRepository);
+const patientService = new PatientService(patientRepository, systemSettingService, patientOtpService);
 
 const passkeyRepository = new PasskeyRepository(prisma);
 const passkeyService = new PasskeyService(passkeyRepository, authRepository, sessionService);
@@ -67,13 +81,16 @@ const billingRepository = new BillingRepository(prisma);
 const billingService = new BillingService(billingRepository, auditService, mailerService);
 
 const receptionistRepository = new ReceptionistRepository(prisma);
-const receptionistService = new ReceptionistService(receptionistRepository, billingRepository, billingService);
+const receptionistService = new ReceptionistService(receptionistRepository, billingRepository, billingService, systemSettingService);
 
 const financeRepository = new FinanceRepository(prisma);
 const financeService = new FinanceService(financeRepository);
 
 const announcementRepository = new AnnouncementRepository(prisma);
 const announcementService = new AnnouncementService(prisma, announcementRepository, staffRepository, notificationRepository, notificationService, mailerService);
+
+const reportRepository = new ReportRepository(prisma);
+const reportService = new ReportService(prisma, reportRepository, staffRepository, notificationService);
 
 export const appContext = Object.freeze({
     logger,
@@ -89,6 +106,7 @@ export const appContext = Object.freeze({
         staffService,
         doctorService,
         patientService,
+        patientOtpService,
         mailerService,
         passkeyService,
         receptionistService,
@@ -96,6 +114,9 @@ export const appContext = Object.freeze({
         billingService,
         financeService,
         announcementService,
+        systemSettingService,
+        reportService,
+        whatsAppService,
     },
 });
 

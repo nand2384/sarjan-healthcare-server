@@ -1,9 +1,9 @@
 /**
- * Number of BOOKED patients that must have started consultation ahead of a
- * waiting walk-in before that walk-in is "promoted" and becomes eligible to
- * be called in ahead of any remaining un-promoted BOOKED patients.
+ * Fallback used only if the admin-configurable setting (SystemSettingKey.WALK_IN_PRIORITY_THRESHOLD)
+ * can't be resolved for some reason. Callers should always pass the real value —
+ * see ReceptionistService.getDashboardData/getDoctorDashboardData.
  */
-export const WALK_IN_PRIORITY_THRESHOLD = 3;
+export const DEFAULT_WALK_IN_PRIORITY_THRESHOLD = 3;
 
 const CHECKED_IN_STATUS_ID = 5;
 
@@ -16,8 +16,8 @@ interface QueueOrderableAppointment {
     } | null;
 }
 
-export function isPromotedWalkIn(appt: QueueOrderableAppointment): boolean {
-    return appt.queue?.queue_type === 'WALK_IN' && (appt.queue?.skip_count ?? 0) >= WALK_IN_PRIORITY_THRESHOLD;
+export function isPromotedWalkIn(appt: QueueOrderableAppointment, threshold: number = DEFAULT_WALK_IN_PRIORITY_THRESHOLD): boolean {
+    return appt.queue?.queue_type === 'WALK_IN' && (appt.queue?.skip_count ?? 0) >= threshold;
 }
 
 /**
@@ -28,10 +28,13 @@ export function isPromotedWalkIn(appt: QueueOrderableAppointment): boolean {
  * "waiting" set (in-consultation, scheduled-not-arrived, completed, etc.)
  * keep their original relative order.
  */
-export function sortAppointmentsByQueuePriority<T extends QueueOrderableAppointment>(appointments: T[]): T[] {
+export function sortAppointmentsByQueuePriority<T extends QueueOrderableAppointment>(
+    appointments: T[],
+    threshold: number = DEFAULT_WALK_IN_PRIORITY_THRESHOLD,
+): T[] {
     const rank = (appt: T): number => {
         if (appt.appointment_status_id !== CHECKED_IN_STATUS_ID) return 1;
-        if (isPromotedWalkIn(appt)) return -2;
+        if (isPromotedWalkIn(appt, threshold)) return -2;
         if (appt.queue?.queue_type === 'BOOKED') return -1;
         return 0;
     };

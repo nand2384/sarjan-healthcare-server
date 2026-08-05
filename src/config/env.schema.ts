@@ -23,4 +23,9 @@ export const envSchema = z.object({
     PASSKEY_ORIGIN: z.url(),
     PASSKEY_RP_ID: z.string(),
     PASSKEY_RP_NAME: z.string(),
+    // Optional: WhatsApp sending degrades to a logging no-op when these are unset
+    // (e.g. local dev, or before a Meta Business/test account exists).
+    META_WHATSAPP_TOKEN: z.string().optional(),
+    META_WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+    META_WHATSAPP_API_VERSION: z.string().default("v20.0"),
 });

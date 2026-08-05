@@ -41,6 +41,7 @@ enum AuditEntityType {
   WEBSITE
   MASTER_DATA
   ROLE
+  SYSTEM_SETTING
 }
 
 enum DayOfWeek {
@@ -219,6 +220,11 @@ model Staff {
   payments_collected Payment[] @relation("PaymentCollectedBy")
   payments_refunded  Payment[] @relation("PaymentRefundedBy")
 
+  reports_filed    Report[] @relation("ReportReportedBy")
+  reports_resolved Report[] @relation("ReportResolvedBy")
+
+  report_messages_sent ReportMessage[] @relation("ReportMessageSender")
+
   @@index([gender_id])
   @@index([username])
   @@index([email])
@@ -257,9 +263,10 @@ model Patient {
   middle_name String?
   last_name   String
 
-  mobile_number   String?
-  whatsapp_number String?
-  email           String?
+  mobile_number       String?
+  whatsapp_number     String?
+  whatsapp_verified_at DateTime?
+  email               String?
 
   gender_id Int?
 
@@ -269,6 +276,8 @@ model Patient {
   city           String?
   state          String?
   pincode        String?
+
+  referred_by String?
 
   is_account_complete Boolean @default(false)
 
@@ -284,6 +293,8 @@ model Patient {
 
   test_orders TestOrder[]
   payments    Payment[]
+
+  otp_verifications PatientOtpVerification[]
 
   @@index([gender_id])
   @@index([patient_account_id])
@@ -761,4 +772,95 @@ model Announcement {
 
   @@index([is_active])
   @@map("announcement")
+}
+
+// Admin-configurable runtime values (e.g. appointment reminder offset, walk-in
+// queue-priority threshold) that would otherwise be hardcoded constants.
+// Read-heavy keys are cached in Redis by SystemSettingService (mirrors
+// MasterService's caching pattern) — this table is the source of truth, not
+// the hot path.
+model SystemSetting {
+  setting_key   String   @id
+  setting_value String
+  updated_at    DateTime @updatedAt
+
+  @@map("system_setting")
+}
+
+model PatientOtpVerification {
+  otp_verification_id Int @id @default(autoincrement())
+
+  // Nullable: OTP can be sent/verified before the patient record exists
+  // (verification happens inline during registration, not after).
+  patient_id Int?
+
+  whatsapp_number String
+  otp_code_hash   String
+  expires_at      DateTime
+  verified_at     DateTime?
+  attempt_count   Int       @default(0)
+
+  created_at DateTime @default(now())
+
+  patient Patient? @relation(fields: [patient_id], references: [patient_id])
+
+  @@index([whatsapp_number])
+  @@index([patient_id])
+  @@map("patient_otp_verification")
+}
+
+enum ReportType {
+  BUG
+  UPDATE
+  FEATURE_REQUEST
+}
+
+enum ReportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+model Report {
+  report_id Int @id @default(autoincrement())
+
+  report_type ReportType
+  page_path   String
+  page_label  String
+  description String
+
+  status          ReportStatus @default(OPEN)
+  developer_notes String?
+
+  reported_by_staff_id Int
+  resolved_by_staff_id Int?
+  resolved_at           DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  reported_by Staff  @relation("ReportReportedBy", fields: [reported_by_staff_id], references: [staff_id])
+  resolved_by Staff? @relation("ReportResolvedBy", fields: [resolved_by_staff_id], references: [staff_id])
+
+  messages ReportMessage[]
+
+  @@index([status])
+  @@map("report")
+}
+
+model ReportMessage {
+  report_message_id Int @id @default(autoincrement())
+
+  report_id Int
+  sender_staff_id Int
+
+  message String
+
+  created_at DateTime @default(now())
+
+  report Report @relation(fields: [report_id], references: [report_id])
+  sender Staff  @relation("ReportMessageSender", fields: [sender_staff_id], references: [staff_id])
+
+  @@index([report_id])
+  @@map("report_message")
 }

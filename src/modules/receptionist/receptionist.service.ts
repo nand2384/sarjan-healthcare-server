@@ -5,6 +5,8 @@ import { BillingRepository } from "@modules/billing/billing.repository";
 import { BillingService } from "@modules/billing/billing.service";
 import { CheckoutPaymentMethod } from "@modules/billing/billing.dto";
 import { WebSocketPublisher } from "websocket";
+import { SystemSettingService } from "@modules/system-setting/system-setting.service";
+import { SystemSettingKey } from "constants/system-setting.constants";
 
 type AuditContext = { performed_by_staff_id: number; ip_address?: string; user_agent?: string };
 
@@ -13,6 +15,7 @@ export class ReceptionistService {
         private readonly receptionistRepository: ReceptionistRepository,
         private readonly billingRepository: BillingRepository,
         private readonly billingService: BillingService,
+        private readonly systemSettingService: SystemSettingService,
     ) {}
 
     public async getDashboardData() {
@@ -22,11 +25,14 @@ export class ReceptionistService {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const doctors = await this.receptionistRepository.getDoctorsInOpd(today, tomorrow);
-        const upcomingAppointments = await this.receptionistRepository.getUpcomingAppointments(today, tomorrow);
-        const stats = await this.receptionistRepository.getDailyStats(today, tomorrow);
+        const [doctors, upcomingAppointments, stats, walkInPriorityThreshold] = await Promise.all([
+            this.receptionistRepository.getDoctorsInOpd(today, tomorrow),
+            this.receptionistRepository.getUpcomingAppointments(today, tomorrow),
+            this.receptionistRepository.getDailyStats(today, tomorrow),
+            this.systemSettingService.getNumber(SystemSettingKey.WALK_IN_PRIORITY_THRESHOLD),
+        ]);
 
-        return ReceptionistMapper.toDashboardResponse(doctors, upcomingAppointments, stats);
+        return ReceptionistMapper.toDashboardResponse(doctors, upcomingAppointments, stats, walkInPriorityThreshold);
     }
 
     public async getAllAppointments(startDateStr?: string, endDateStr?: string) {
@@ -58,10 +64,13 @@ export class ReceptionistService {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const doctor = await this.receptionistRepository.getDoctorWithAppointments(doctorId, today, tomorrow);
-        const upcomingAppointments = await this.receptionistRepository.getUpcomingAppointments(today, tomorrow, doctorId);
+        const [doctor, upcomingAppointments, walkInPriorityThreshold] = await Promise.all([
+            this.receptionistRepository.getDoctorWithAppointments(doctorId, today, tomorrow),
+            this.receptionistRepository.getUpcomingAppointments(today, tomorrow, doctorId),
+            this.systemSettingService.getNumber(SystemSettingKey.WALK_IN_PRIORITY_THRESHOLD),
+        ]);
 
-        return ReceptionistMapper.toDoctorDashboardResponse(doctor, upcomingAppointments);
+        return ReceptionistMapper.toDoctorDashboardResponse(doctor, upcomingAppointments, walkInPriorityThreshold);
     }
 
     public async checkInPatient(appointmentId: number, createdByStaffId: number) {
@@ -121,6 +130,11 @@ export class ReceptionistService {
         }
 
         return result;
+    }
+
+    /** Thin passthrough used by the appointment-reminder sweep job (no mapping/pagination needed there). */
+    public async getBookedAppointmentsForDate(start: Date, end: Date) {
+        return this.receptionistRepository.getUpcomingAppointments(start, end);
     }
 
     public async getAppointmentHistory(filters: AppointmentHistoryFilters) {

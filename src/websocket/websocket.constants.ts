@@ -6,6 +6,7 @@ export enum SocketRoom {
 export enum SocketEvent {
     QUEUE_UPDATED = "queue.updated",
     NOTIFICATION_NEW = "notification.new",
+    SCHEDULE_UPDATED = "schedule.updated",
 }
 
 export enum UserRole {

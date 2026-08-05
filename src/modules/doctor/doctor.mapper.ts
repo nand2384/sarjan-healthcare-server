@@ -19,7 +19,7 @@ export interface DoctorLeaveResponseDto {
     doctor_staff_id: number;
     start_date: Date;
     end_date: Date;
-    reason: string;
+    reason: string | null;
     doctor_availability_id: number | null;
     start_time_formatted?: string | null;
     end_time_formatted?: string | null;

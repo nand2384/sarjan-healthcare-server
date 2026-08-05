@@ -35,4 +35,11 @@ export interface SendAnnouncementMailOptions {
     firstName: string;
     message: string;
     type: "info" | "warning" | "danger";
+}
+
+export interface SendDoctorShiftNoticeMailOptions {
+    to: string;
+    firstName: string;
+    appointmentCount: number;
+    firstSlotTime: string;
 }

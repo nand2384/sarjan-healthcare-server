@@ -12,28 +12,28 @@ const notificationController = new NotificationController(appContext.services.no
 notificationRouter.get(
     "/",
     authMiddleware,
-    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST, USER_ROLE.DEVELOPER),
     notificationController.getNotifications,
 );
 
 notificationRouter.get(
     "/unread-count",
     authMiddleware,
-    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST, USER_ROLE.DEVELOPER),
     notificationController.getUnreadCount,
 );
 
 notificationRouter.patch(
     "/read-all",
     authMiddleware,
-    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST, USER_ROLE.DEVELOPER),
     notificationController.markAllAsRead,
 );
 
 notificationRouter.patch(
     "/:id/read",
     authMiddleware,
-    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST, USER_ROLE.DEVELOPER),
     validate(idParamSchema, "params"),
     notificationController.markAsRead,
 );

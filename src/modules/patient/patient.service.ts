@@ -1,12 +1,83 @@
 import { RegisterAndBookRequestDto, RegisterAndBookResponseDto, SearchDuplicatesRequestDto, SearchDuplicatesResponseDto } from "./patient.dtos";
 import { PatientRepository } from "./patient.repository";
+import { PatientOtpService } from "./patient-otp.service";
 import { PatientMapper } from "./patient.mapper";
 import { WebSocketPublisher } from "websocket";
 import { QueueType } from "@generated/prisma/client";
 import { AppError, ErrorCode } from "@errors";
+import { SystemSettingService } from "@modules/system-setting/system-setting.service";
+import { SystemSettingKey } from "constants/system-setting.constants";
+import { getAppointmentStartInstantUTC, formatSlotTime12Hour } from "utils/appointment-time.util";
+import { scheduleReminder } from "queues/reminder.queue";
+import { CLINIC_NAME } from "whatsapp";
+import { logger } from "@logger";
 
 export class PatientService {
-    constructor(private readonly patientRepository: PatientRepository) {}
+    constructor(
+        private readonly patientRepository: PatientRepository,
+        private readonly systemSettingService: SystemSettingService,
+        private readonly patientOtpService: PatientOtpService,
+    ) {}
+
+    /**
+     * Never blocks registration — an unverified or lookup-failed number simply
+     * registers without `whatsapp_verified_at` set (per confirmed product
+     * decision: OTP verification is informational, never a hard gate).
+     */
+    private async getWhatsappVerifiedAt(whatsappNumber: string): Promise<Date | undefined> {
+        try {
+            const verifiedAt = await this.patientOtpService.consumeVerification(whatsappNumber);
+            return verifiedAt ?? undefined;
+        } catch (error) {
+            logger.error({ err: error, whatsappNumber }, "Failed to check WhatsApp OTP verification status");
+            return undefined;
+        }
+    }
+
+    /**
+     * Covers same-day bookings and next-day bookings made after tonight's
+     * sweep already ran — anything further out is left to the nightly sweep,
+     * which re-derives from current DB state (avoiding a stale job if the
+     * doctor's schedule changes before the appointment date). Never throws —
+     * a reminder-scheduling hiccup must not fail the booking itself.
+     */
+    private async maybeScheduleReminderForNewBooking(appointmentId: number, appointmentDate: Date): Promise<void> {
+        try {
+            const todayMidnightUTC = new Date();
+            todayMidnightUTC.setUTCHours(0, 0, 0, 0);
+            const dayAfterTomorrowMidnightUTC = new Date(todayMidnightUTC);
+            dayAfterTomorrowMidnightUTC.setUTCDate(dayAfterTomorrowMidnightUTC.getUTCDate() + 2);
+
+            if (appointmentDate < todayMidnightUTC || appointmentDate >= dayAfterTomorrowMidnightUTC) {
+                return;
+            }
+
+            const context = await this.patientRepository.getAppointmentReminderContext(appointmentId);
+            if (!context?.doctor_availability?.start_time || !context.patient?.whatsapp_number || !context.doctor) {
+                return;
+            }
+
+            const hoursBefore = await this.systemSettingService.getNumber(SystemSettingKey.APPOINTMENT_REMINDER_HOURS_BEFORE);
+            const startInstant = getAppointmentStartInstantUTC(context.appointment_date, context.doctor_availability.start_time);
+            const delayMs = startInstant.getTime() - hoursBefore * 60 * 60 * 1000 - Date.now();
+
+            if (delayMs <= 0) return;
+
+            await scheduleReminder(
+                {
+                    appointmentId,
+                    patientName: `${context.patient.first_name} ${context.patient.last_name}`,
+                    whatsappNumber: context.patient.whatsapp_number,
+                    doctorName: `Dr. ${context.doctor.first_name} ${context.doctor.last_name}`,
+                    slotTimeFormatted: formatSlotTime12Hour(context.doctor_availability.start_time),
+                    clinicName: CLINIC_NAME,
+                },
+                delayMs,
+            );
+        } catch (error) {
+            logger.error({ err: error, appointmentId }, "Failed to schedule appointment reminder at booking time");
+        }
+    }
 
     private async generateUHID(first_name: string, middle_name?: string | null, last_name?: string | null): Promise<string> {
         const now = new Date();
@@ -48,7 +119,10 @@ export class PatientService {
         } = data;
 
         const uhid = await this.generateUHID(data.first_name, data.middle_name, data.last_name);
-        const patientData = { ...patientBaseData, uhid };
+        const whatsappVerifiedAt = patientBaseData.whatsapp_number
+            ? await this.getWhatsappVerifiedAt(patientBaseData.whatsapp_number)
+            : undefined;
+        const patientData = { ...patientBaseData, uhid, ...(whatsappVerifiedAt ? { whatsapp_verified_at: whatsappVerifiedAt } : {}) };
 
         const appointmentStatusId = mode === 'walk-in' ? 5 : 4;
         const parsedAppointmentDate = new Date(appointment_date);
@@ -98,6 +172,10 @@ export class PatientService {
         );
 
         WebSocketPublisher.queueUpdated({ appointmentId: appointment.appointment_id }, createdByStaffId, appointment.doctor_staff_id);
+
+        if (mode !== 'walk-in') {
+            void this.maybeScheduleReminderForNewBooking(appointment.appointment_id, appointment.appointment_date);
+        }
 
         return PatientMapper.toRegisterAndBookResponse(patient, appointment, queue);
     }
@@ -197,6 +275,10 @@ export class PatientService {
 
         WebSocketPublisher.queueUpdated({ appointmentId: appointment.appointment_id }, createdByStaffId, appointment.doctor_staff_id);
 
+        if (mode !== 'walk-in') {
+            void this.maybeScheduleReminderForNewBooking(appointment.appointment_id, appointment.appointment_date);
+        }
+
         return PatientMapper.toRegisterAndBookResponse(patient, appointment, queue);
     }
 
@@ -245,7 +327,10 @@ export class PatientService {
         }
 
         const uhid = await this.generateUHID(data.first_name, data.middle_name, data.last_name);
-        const patientData = { ...patientBaseData, uhid };
+        const whatsappVerifiedAt = patientBaseData.whatsapp_number
+            ? await this.getWhatsappVerifiedAt(patientBaseData.whatsapp_number)
+            : undefined;
+        const patientData = { ...patientBaseData, uhid, ...(whatsappVerifiedAt ? { whatsapp_verified_at: whatsappVerifiedAt } : {}) };
 
         const appointmentData = {
             doctor_staff_id,
