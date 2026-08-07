@@ -19,6 +19,7 @@ import { UpdateStaffDto } from "./staff.schema";
 import { StaffListEntity } from "./staff.types";
 import { AuthService } from "@modules/auth/auth.service";
 import { NotificationService } from "@modules/notification/notification.service";
+import { WebSocketPublisher } from "websocket";
 
 export class StaffService {
     constructor(
@@ -262,6 +263,10 @@ export class StaffService {
             }, tx);
         });
 
+        // Post-commit — the target staff member's client refetches /auth/me
+        // instead of continuing to act on a stale role set.
+        WebSocketPublisher.rolesUpdated(staffId);
+
         return await this.getStaffById(staffId);
     }
 
@@ -323,6 +328,22 @@ export class StaffService {
         notifiedAdminIds.forEach((adminId) => this.notificationService.pingNew(adminId));
 
         return data;
+    }
+
+    public async unlockStaff(staffId: number, auditContext: { performed_by_staff_id: number, ip_address: string, user_agent: string }): Promise<StaffListEntity> {
+        return await this.prisma.$transaction(async (tx) => {
+            const staff = await this.staffRepository.unlock(staffId, tx);
+
+            await this.auditService.log({
+                ...auditContext,
+                entity_type: AuditEntityType.STAFF,
+                entity_id: staffId.toString(),
+                action: AuditAction.ACCOUNT_UNLOCKED,
+                new_values: { locked_until: null, failed_login_count: 0 },
+            }, tx);
+
+            return staff;
+        });
     }
 
     public async deleteStaff(staffId: number, auditContext: { performed_by_staff_id: number, ip_address: string, user_agent: string }) {

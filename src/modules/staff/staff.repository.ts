@@ -46,6 +46,8 @@ export class StaffRepository {
                 is_account_activated: true,
                 last_login_at: true,
                 created_at: true,
+                locked_until: true,
+                failed_login_count: true,
                 gender: {
                     select: {
                         value_id: true,
@@ -112,6 +114,8 @@ export class StaffRepository {
                 is_account_activated: true,
                 last_login_at: true,
                 created_at: true,
+                locked_until: true,
+                failed_login_count: true,
             },
         });
     }
@@ -188,6 +192,9 @@ export class StaffRepository {
                 last_login_at: true,
                 created_at: true,
 
+                locked_until: true,
+                failed_login_count: true,
+
                 gender: {
                     select: {
                         value_id: true,
@@ -233,6 +240,60 @@ export class StaffRepository {
 
                 last_login_at: true,
                 created_at: true,
+
+                locked_until: true,
+                failed_login_count: true,
+
+                gender: {
+                    select: {
+                        value_id: true,
+                        value_name: true,
+                    },
+                },
+
+                staff_roles: {
+                    select: {
+                        role: {
+                            select: {
+                                role_id: true,
+                                role_name: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+    }
+
+    public async unlock(staffId: number, tx?: Prisma.TransactionClient): Promise<StaffListEntity> {
+        const db = tx ?? this.prisma;
+
+        return db.staff.update({
+            where: {
+                staff_id: staffId,
+            },
+            data: {
+                failed_login_count: 0,
+                failed_login_window_started_at: null,
+                locked_until: null,
+            },
+            select: {
+                staff_id: true,
+
+                first_name: true,
+                last_name: true,
+
+                email: true,
+                mobile_number: true,
+
+                is_disabled: true,
+                is_account_activated: true,
+
+                last_login_at: true,
+                created_at: true,
+
+                locked_until: true,
+                failed_login_count: true,
 
                 gender: {
                     select: {

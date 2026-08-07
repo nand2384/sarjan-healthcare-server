@@ -57,6 +57,7 @@ export class AuthController {
             email: data.email,
             mobile_number: data.mobile_number,
             roles: data.roles as MeResponseDto["roles"],
+            maintenance_mode: data.maintenance_mode,
         };
 
         return res.status(200).json({

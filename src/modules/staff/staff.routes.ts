@@ -74,6 +74,15 @@ staffRouter.patch(
     staffController.restoreStaff.bind(staffController),
 );
 
+// PATCH /staff/:id/unlock
+staffRouter.patch(
+    "/:id/unlock",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN),
+    validate(idParamSchema, "params"),
+    staffController.unlockStaff.bind(staffController),
+);
+
 // DELETE /staff/:id
 staffRouter.delete(
     "/:id",

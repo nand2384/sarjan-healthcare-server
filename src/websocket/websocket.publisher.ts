@@ -55,4 +55,36 @@ export class WebSocketPublisher {
             { doctorId }
         );
     }
+
+    /**
+     * Tells each recipient's client that a specific report changed (new
+     * message or status update) so an open Developer Dashboard table, "Your
+     * Reports" list, or conversation view can refetch live — separate from
+     * `notificationCreated`, which only pings the bell.
+     */
+    static reportUpdated(reportId: number, recipientStaffIds: number[]): void {
+        const websocketService = getWebSocketService();
+        recipientStaffIds.forEach((staffId) =>
+            websocketService.emitToStaff(staffId, SocketEvent.REPORT_UPDATED, { reportId })
+        );
+    }
+
+    /**
+     * Tells a staff member their role assignments changed, so their client
+     * refetches `/auth/me` rather than keep acting on a stale role set.
+     * Payload is intentionally empty — same pattern as `notificationCreated`.
+     */
+    static rolesUpdated(staffId: number): void {
+        getWebSocketService().emitToStaff(staffId, SocketEvent.ROLES_UPDATED, {});
+    }
+
+    /**
+     * Broadcasts a maintenance-mode flip to every connected client, so
+     * already-open tabs can show a banner before their next request 503s
+     * (the middleware itself is the actual source of truth, this is just a
+     * heads-up).
+     */
+    static maintenanceModeChanged(enabled: boolean): void {
+        getWebSocketService().broadcast(SocketEvent.MAINTENANCE_MODE_CHANGED, { enabled });
+    }
 }

@@ -28,6 +28,7 @@ export interface MeResponseDto {
     email: string;
     mobile_number: string;
     roles: UserRole[];
+    maintenance_mode: boolean;
 }
 
 export interface VerifyActivationRequestDto {

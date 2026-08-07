@@ -30,11 +30,16 @@ export class AuthRepository {
             },
             select: {
                 staff_id: true,
+                first_name: true,
                 username: true,
+                email: true,
                 password_hash: true,
                 is_disabled: true,
                 is_account_activated: true,
                 deleted_at: true,
+                failed_login_count: true,
+                failed_login_window_started_at: true,
+                locked_until: true,
 
                 staff_roles: {
                     where: {
@@ -234,6 +239,9 @@ export class AuthRepository {
                 password_hash: hashedPassword,
                 password_reset_token: null,
                 password_reset_token_expires_at: null,
+                failed_login_count: 0,
+                failed_login_window_started_at: null,
+                locked_until: null,
             },
             select: {
                 staff_id: true,
@@ -303,5 +311,35 @@ export class AuthRepository {
                 email: true,
             },
         });
+    }
+
+    public async recordFailedLoginAttempt(staffId: number, data: {
+        failed_login_count: number;
+        failed_login_window_started_at: Date;
+        locked_until: Date | null;
+    }) {
+        return await this.prisma.staff.update({
+            where: { staff_id: staffId },
+            data,
+        });
+    }
+
+    public async resetLoginAttempts(staffId: number) {
+        return await this.prisma.staff.update({
+            where: { staff_id: staffId },
+            data: {
+                failed_login_count: 0,
+                failed_login_window_started_at: null,
+                locked_until: null,
+                last_login_at: new Date(),
+            },
+        });
+    }
+
+    public async findRoleIdByName(roleName: string): Promise<number | null> {
+        const role = await this.prisma.roleMaster.findFirst({
+            where: { role_name: { equals: roleName, mode: "insensitive" } },
+        });
+        return role?.role_id ?? null;
     }
 }

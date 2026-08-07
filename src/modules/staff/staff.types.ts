@@ -16,6 +16,9 @@ export type StaffListEntity = Prisma.StaffGetPayload<{
         last_login_at: true;
         created_at: true;
 
+        locked_until: true;
+        failed_login_count: true;
+
         gender: {
             select: {
                 value_id: true;
@@ -69,5 +72,7 @@ export type StaffDetailEntity = Prisma.StaffGetPayload<{
         is_account_activated: true;
         last_login_at: true;
         created_at: true;
+        locked_until: true;
+        failed_login_count: true;
     };
 }>;

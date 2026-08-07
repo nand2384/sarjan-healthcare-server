@@ -99,6 +99,31 @@ export class SessionRepository {
         });
     }
 
+    public async findAllActive() {
+        return await this.prisma.session.findMany({
+            where: {
+                expires_at: { gt: new Date() },
+            },
+            include: {
+                staff: {
+                    select: {
+                        staff_id: true,
+                        first_name: true,
+                        last_name: true,
+                        staff_roles: {
+                            select: {
+                                role: { select: { role_name: true } },
+                            },
+                        },
+                    },
+                },
+            },
+            orderBy: {
+                last_activity: "desc",
+            },
+        });
+    }
+
     public async findSessionsByStaffId(staffId: number) {
         return await this.prisma.session.findMany({
             where: {

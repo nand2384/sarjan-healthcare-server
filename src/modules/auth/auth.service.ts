@@ -1,19 +1,30 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 
+import { AuditAction, AuditEntityType } from "@generated/prisma/client";
 import { AppError, ErrorCode } from "@errors";
 import { AuthRepository } from "./auth.repository";
 import { LoginRequestDto, VerifyActivationResponse } from "./auth.dtos";
 import { SessionService } from "@modules/session";
-import { env } from "node:process";
+import { StaffRepository } from "@modules/staff/staff.repository";
+import { AuditService } from "@modules/audit/audit.service";
+import { SystemSettingService } from "@modules/system-setting/system-setting.service";
+import { SystemSettingKey, SystemSettingBooleanKey } from "constants/system-setting.constants";
+import { USER_ROLE } from "common/common.schema";
+import { env } from "@config";
 import { MailerService } from "mailer";
 import { logger } from "@logger";
+
+const DEVELOPER_ROLE_NAME = "Developer";
 
 export class AuthService {
     constructor(
         private readonly authRepository: AuthRepository,
         private readonly sessionService: SessionService,
         private readonly mailerService: MailerService,
+        private readonly staffRepository: StaffRepository,
+        private readonly auditService: AuditService,
+        private readonly systemSettingService: SystemSettingService,
     ) {}
 
     public async login(loginRequest: LoginRequestDto) {
@@ -33,6 +44,11 @@ export class AuthService {
             throw new AppError(401, ErrorCode.ACCOUNT_DISABLED, "Account has been disabled");
         }
 
+        if (staff.locked_until && staff.locked_until > new Date()) {
+            const minutesLeft = Math.max(1, Math.ceil((staff.locked_until.getTime() - Date.now()) / 60000));
+            throw new AppError(401, ErrorCode.ACCOUNT_LOCKED, `Account temporarily locked due to repeated failed login attempts. Try again in ${minutesLeft} minute${minutesLeft === 1 ? "" : "s"}.`);
+        }
+
         if (!staff.is_account_activated || !staff.password_hash) {
             throw new AppError(403, ErrorCode.ACCOUNT_NOT_ACTIVATED, "Account has not been activated yet");
         }
@@ -40,8 +56,25 @@ export class AuthService {
         const isPasswordValid = await bcrypt.compare(password, staff.password_hash!);
 
         if (!isPasswordValid) {
+            await this.handleFailedLoginAttempt(staff, ipAddress, userAgent);
             throw new AppError(401, ErrorCode.INVALID_CREDENTIALS, "Invalid username or password");
         }
+
+        const roles = staff.staff_roles.map((staffRole) => staffRole.role.role_name.toLowerCase());
+        const hasMaintenanceBypassRole = roles.includes(USER_ROLE.ADMIN) || roles.includes(USER_ROLE.DEVELOPER);
+
+        if (!hasMaintenanceBypassRole) {
+            const maintenanceModeEnabled = await this.systemSettingService.getBoolean(SystemSettingBooleanKey.MAINTENANCE_MODE_ENABLED);
+            if (maintenanceModeEnabled) {
+                // Deliberately blocked here rather than letting them log in — there's
+                // nothing for a non-admin/developer dashboard to show while every other
+                // API route is 503ing, so a "successful" login would just strand them
+                // on a broken screen instead of telling them what's actually going on.
+                throw new AppError(503, ErrorCode.MAINTENANCE_MODE, "The site is temporarily down for maintenance. Please check back shortly.");
+            }
+        }
+
+        await this.authRepository.resetLoginAttempts(staff.staff_id);
 
         const session = await this.sessionService.createSession(staff, ipAddress, userAgent);
 
@@ -49,6 +82,117 @@ export class AuthService {
             staff,
             session,
         };
+    }
+
+    /**
+     * Tracks a wrong-password attempt against a real account within a rolling
+     * window, logs it to the audit trail every time (cheap forensic record),
+     * and — only on the specific attempt that crosses the threshold — locks
+     * the account and fans out a security alert to every developer. This
+     * makes the alert self-limiting to once per lockout episode, since every
+     * attempt during the lockout window itself is rejected before reaching
+     * this method at all.
+     */
+    private async handleFailedLoginAttempt(
+        staff: { staff_id: number; first_name: string; username: string; email: string; failed_login_count: number; failed_login_window_started_at: Date | null },
+        ipAddress: string | null,
+        userAgent: string | null,
+    ): Promise<void> {
+        const [maxAttempts, windowMinutes, lockoutMinutes] = await Promise.all([
+            this.systemSettingService.getNumber(SystemSettingKey.FAILED_LOGIN_MAX_ATTEMPTS),
+            this.systemSettingService.getNumber(SystemSettingKey.FAILED_LOGIN_WINDOW_MINUTES),
+            this.systemSettingService.getNumber(SystemSettingKey.LOCKOUT_DURATION_MINUTES),
+        ]);
+        const windowMs = windowMinutes * 60 * 1000;
+        const lockoutMs = lockoutMinutes * 60 * 1000;
+
+        const now = new Date();
+        const windowStillActive = staff.failed_login_window_started_at
+            && now.getTime() - staff.failed_login_window_started_at.getTime() < windowMs;
+
+        const newCount = windowStillActive ? staff.failed_login_count + 1 : 1;
+        const windowStartedAt = windowStillActive ? staff.failed_login_window_started_at! : now;
+        const isLockingNow = newCount >= maxAttempts;
+        const lockedUntil = isLockingNow ? new Date(now.getTime() + lockoutMs) : null;
+
+        await this.authRepository.recordFailedLoginAttempt(staff.staff_id, {
+            failed_login_count: newCount,
+            failed_login_window_started_at: windowStartedAt,
+            locked_until: lockedUntil,
+        });
+
+        await this.auditService.log({
+            entity_type: AuditEntityType.STAFF,
+            entity_id: staff.staff_id.toString(),
+            action: isLockingNow ? AuditAction.ACCOUNT_LOCKED : AuditAction.FAILED_LOGIN_ATTEMPT,
+            new_values: { failed_login_count: newCount, ip_address: ipAddress, user_agent: userAgent },
+            ip_address: ipAddress ?? undefined,
+            user_agent: userAgent ?? undefined,
+        }).catch((error) => logger.error({ err: error }, "Failed to write audit log for failed login attempt"));
+
+        if (isLockingNow && lockedUntil) {
+            this.sendSecurityAlert(staff, newCount, lockedUntil, ipAddress).catch((error) =>
+                logger.error({ err: error, staffId: staff.staff_id }, "Failed to send security alert email"));
+
+            this.sendAccountLockedNotice(staff, newCount, lockedUntil).catch((error) =>
+                logger.error({ err: error, staffId: staff.staff_id }, "Failed to send account locked notice email"));
+        }
+    }
+
+    /**
+     * Emails the locked-out owner a password reset link. Reusing the same
+     * reset-token flow as forgot-password means completing it also clears
+     * the lockout (see AuthRepository.completePasswordReset) — the account
+     * owner isn't stuck waiting out the full lockout if they act quickly.
+     */
+    private async sendAccountLockedNotice(
+        staff: { staff_id: number; first_name: string; username: string; email: string },
+        failedAttempts: number,
+        lockedUntil: Date,
+    ): Promise<void> {
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+        await this.authRepository.setPasswordResetToken(staff.staff_id, resetToken, expiresAt);
+
+        const resetLink = `${env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+        const lockedUntilFormatted = lockedUntil.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+        await this.mailerService.sendAccountLockedMail({
+            to: staff.email,
+            firstName: staff.first_name,
+            username: staff.username,
+            failedAttempts,
+            lockedUntilFormatted,
+            resetLink,
+        });
+    }
+
+    private async sendSecurityAlert(
+        staff: { first_name: string; username: string },
+        failedAttempts: number,
+        lockedUntil: Date,
+        ipAddress: string | null,
+    ): Promise<void> {
+        const developerRoleId = await this.authRepository.findRoleIdByName(DEVELOPER_ROLE_NAME);
+        if (!developerRoleId) {
+            logger.warn("No Developer role found — skipping security alert fan-out");
+            return;
+        }
+
+        const developers = await this.staffRepository.getActiveStaffIdsByRole(developerRoleId);
+        const lockedUntilFormatted = lockedUntil.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+        await Promise.all(developers.map((developer) =>
+            this.mailerService.sendSecurityAlert({
+                to: developer.email,
+                developerFirstName: developer.first_name,
+                staffName: staff.first_name,
+                username: staff.username,
+                failedAttempts,
+                lockedUntilFormatted,
+                ipAddress: ipAddress ?? undefined,
+            })
+        ));
     }
 
     public async logout(sessionId: string) {
@@ -67,6 +211,8 @@ export class AuthService {
             throw new AppError(401, ErrorCode.ACCOUNT_DISABLED, "Account has been disabled or deleted");
         }
 
+        const maintenanceModeEnabled = await this.systemSettingService.getBoolean(SystemSettingBooleanKey.MAINTENANCE_MODE_ENABLED);
+
         return {
             staff_id: staffId,
             username: profile.username,
@@ -75,6 +221,12 @@ export class AuthService {
             email: profile.email,
             mobile_number: profile.mobile_number,
             roles: profile.staff_roles.map((role) => role.role.role_name.toLowerCase()),
+            // Allow-listed endpoint (see maintenance.middleware.ts) — this is how an
+            // already-logged-in, non-admin/developer client detects maintenance mode
+            // (both when it turns on, to show a clear screen instead of every other
+            // request 503ing forever, and when it turns off, to know it's safe to
+            // resume normal polling).
+            maintenance_mode: maintenanceModeEnabled,
         };
     }
 

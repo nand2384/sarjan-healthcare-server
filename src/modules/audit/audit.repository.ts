@@ -128,6 +128,16 @@ export class AuditRepository {
         });
     }
 
+    /** Resolves STAFF-entity audit rows' raw `entity_id` into a display name — see AuditService.getAuditLogs. */
+    public async findStaffNamesByIds(staffIds: number[], tx?: Prisma.TransactionClient) {
+        const db = tx ?? this.prisma;
+
+        return db.staff.findMany({
+            where: { staff_id: { in: staffIds } },
+            select: { staff_id: true, first_name: true, last_name: true, username: true },
+        });
+    }
+
     public async count(
         filters: GetAuditLogsFilters,
         tx?: Prisma.TransactionClient,

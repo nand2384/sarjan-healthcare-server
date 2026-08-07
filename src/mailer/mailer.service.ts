@@ -1,16 +1,37 @@
 import { env } from "@config";
 
+import { EventLogService } from "@modules/event-log/event-log.service";
 import { mailTransporter } from "./mailer.provider";
-import { staffActivationTemplate, doctorFeeMissingTemplate, passwordResetTemplate, emailChangeConfirmationTemplate, announcementTemplate, doctorShiftNoticeTemplate } from "./mailer.templates";
-import { SendMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions, SendPasswordResetMailOptions, SendEmailChangeConfirmationMailOptions, SendAnnouncementMailOptions, SendDoctorShiftNoticeMailOptions } from "./mailer.types";
+import { staffActivationTemplate, doctorFeeMissingTemplate, passwordResetTemplate, emailChangeConfirmationTemplate, announcementTemplate, doctorShiftNoticeTemplate, securityAlertTemplate, accountLockedTemplate } from "./mailer.templates";
+import { SendMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions, SendPasswordResetMailOptions, SendEmailChangeConfirmationMailOptions, SendAnnouncementMailOptions, SendDoctorShiftNoticeMailOptions, SendSecurityAlertMailOptions, SendAccountLockedMailOptions } from "./mailer.types";
 
 export class MailerService {
+    constructor(private readonly eventLogService: EventLogService) {}
+
     async send({ to, subject, html }: SendMailOptions): Promise<void> {
-        await mailTransporter.sendMail({
-            from: env.EMAIL_FROM,
-            to,
-            subject,
-            html,
+        try {
+            await mailTransporter.sendMail({
+                from: env.EMAIL_FROM,
+                to,
+                subject,
+                html,
+            });
+        } catch (error) {
+            this.eventLogService.recordDelivery({
+                channel: "EMAIL",
+                recipient: to,
+                subject_or_template: subject,
+                status: "FAILED",
+                error_message: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+        }
+
+        this.eventLogService.recordDelivery({
+            channel: "EMAIL",
+            recipient: to,
+            subject_or_template: subject,
+            status: "SENT",
         });
     }
 
@@ -105,6 +126,50 @@ export class MailerService {
                 firstName,
                 appointmentCount,
                 firstSlotTime,
+            }),
+        });
+    }
+
+    async sendSecurityAlert({
+        to,
+        developerFirstName,
+        staffName,
+        username,
+        failedAttempts,
+        lockedUntilFormatted,
+        ipAddress,
+    }: SendSecurityAlertMailOptions): Promise<void> {
+        await this.send({
+            to,
+            subject: `Security alert: ${staffName}'s account locked after repeated failed logins`,
+            html: securityAlertTemplate({
+                developerFirstName,
+                staffName,
+                username,
+                failedAttempts,
+                lockedUntilFormatted,
+                ipAddress,
+            }),
+        });
+    }
+
+    async sendAccountLockedMail({
+        to,
+        firstName,
+        username,
+        failedAttempts,
+        lockedUntilFormatted,
+        resetLink,
+    }: SendAccountLockedMailOptions): Promise<void> {
+        await this.send({
+            to,
+            subject: "Your Sarjan Healthcare account has been locked",
+            html: accountLockedTemplate({
+                firstName,
+                username,
+                failedAttempts,
+                lockedUntilFormatted,
+                resetLink,
             }),
         });
     }

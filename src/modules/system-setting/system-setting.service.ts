@@ -2,7 +2,7 @@ import { RedisClientType } from "redis";
 import { AuditAction, AuditEntityType } from "@generated/prisma/client";
 import { SystemSettingRepository } from "./system-setting.repository";
 import { CacheKeys } from "constants/cache.constants";
-import { SystemSettingDefaults, SystemSettingKeyValue } from "constants/system-setting.constants";
+import { SystemSettingDefaults, SystemSettingKeyValue, SystemSettingBooleanDefaults, SystemSettingBooleanKeyValue } from "constants/system-setting.constants";
 import { AuditService } from "@modules/audit/audit.service";
 import { AppError, ErrorCode } from "@errors";
 import { logger } from "@logger";
@@ -63,6 +63,55 @@ export class SystemSettingService {
             entity_id: key,
             action: AuditAction.UPDATE,
             old_values: { setting_value: previous?.setting_value ?? String(SystemSettingDefaults[key]) },
+            new_values: { setting_value: result.setting_value },
+        });
+
+        try {
+            await this.redisClient.del(CacheKeys.systemSetting(key));
+        } catch (error) {
+            logger.error(error, `Failed to invalidate system setting cache for ${key}`);
+        }
+
+        return result;
+    }
+
+    /** Cached read, source of truth is Postgres. Falls back to the key's known default if never set. */
+    public async getBoolean(key: SystemSettingBooleanKeyValue): Promise<boolean> {
+        const cacheKey = CacheKeys.systemSetting(key);
+
+        try {
+            const cached = await this.redisClient.get(cacheKey);
+            if (cached !== null) return cached === "true";
+        } catch (error) {
+            logger.warn(error, `Error fetching system setting ${key} from redis`);
+        }
+
+        const row = await this.systemSettingRepository.findByKey(key);
+        const value = row ? row.setting_value === "true" : SystemSettingBooleanDefaults[key];
+
+        try {
+            await this.redisClient.set(cacheKey, String(value));
+        } catch (error) {
+            logger.warn(error, `Error caching system setting ${key} in redis`);
+        }
+
+        return value;
+    }
+
+    public async updateBooleanSetting(
+        key: SystemSettingBooleanKeyValue,
+        value: boolean,
+        auditContext: { performed_by_staff_id: number; ip_address?: string; user_agent?: string },
+    ) {
+        const previous = await this.systemSettingRepository.findByKey(key);
+        const result = await this.systemSettingRepository.upsert(key, String(value));
+
+        await this.auditService.log({
+            ...auditContext,
+            entity_type: AuditEntityType.SYSTEM_SETTING,
+            entity_id: key,
+            action: AuditAction.UPDATE,
+            old_values: { setting_value: previous?.setting_value ?? String(SystemSettingBooleanDefaults[key]) },
             new_values: { setting_value: result.setting_value },
         });
 

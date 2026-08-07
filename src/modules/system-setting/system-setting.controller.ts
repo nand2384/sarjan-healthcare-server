@@ -1,10 +1,34 @@
 import { Request, Response } from "express";
 import { SystemSettingService } from "./system-setting.service";
-import { SystemSettingKeyValue } from "constants/system-setting.constants";
+import { SystemSettingKeyValue, SystemSettingBooleanKey } from "constants/system-setting.constants";
 import { AppError, ErrorCode } from "@errors";
+import { WebSocketPublisher } from "websocket";
 
 export class SystemSettingController {
     constructor(private readonly systemSettingService: SystemSettingService) {}
+
+    public getMaintenanceMode = async (_req: Request, res: Response) => {
+        const enabled = await this.systemSettingService.getBoolean(SystemSettingBooleanKey.MAINTENANCE_MODE_ENABLED);
+
+        return res.status(200).json({
+            success: true,
+            data: { enabled },
+        });
+    };
+
+    public updateMaintenanceMode = async (req: Request, res: Response) => {
+        const { enabled } = req.body as { enabled: boolean };
+
+        await this.systemSettingService.updateBooleanSetting(SystemSettingBooleanKey.MAINTENANCE_MODE_ENABLED, enabled, req.auditContext);
+
+        WebSocketPublisher.maintenanceModeChanged(enabled);
+
+        return res.status(200).json({
+            success: true,
+            message: `Maintenance mode ${enabled ? "enabled" : "disabled"}.`,
+            data: { enabled },
+        });
+    };
 
     public getSetting = async (req: Request, res: Response) => {
         const key = req.params.key as SystemSettingKeyValue;

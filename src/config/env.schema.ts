@@ -28,4 +28,11 @@ export const envSchema = z.object({
     META_WHATSAPP_TOKEN: z.string().optional(),
     META_WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
     META_WHATSAPP_API_VERSION: z.string().default("v20.0"),
+    // Deployed-version panel — optionally set explicitly in the hosting
+    // platform's env config at deploy time (e.g. Vercel auto-provides
+    // VERCEL_GIT_COMMIT_SHA for client builds; map it to GIT_COMMIT_SHA here
+    // for whatever platform hosts this server). When unset, health.service.ts
+    // falls back to package.json's version and `git rev-parse` (see build-info.ts).
+    APP_VERSION: z.string().optional(),
+    GIT_COMMIT_SHA: z.string().optional(),
 });

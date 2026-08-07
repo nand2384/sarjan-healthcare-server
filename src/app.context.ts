@@ -35,21 +35,33 @@ import { SystemSettingRepository } from "@modules/system-setting/system-setting.
 import { SystemSettingService } from "@modules/system-setting/system-setting.service";
 import { ReportRepository } from "@modules/report/report.repository";
 import { ReportService } from "@modules/report/report.service";
+import { EventLogRepository } from "@modules/event-log/event-log.repository";
+import { EventLogService } from "@modules/event-log/event-log.service";
+import { ReleaseNoteRepository } from "@modules/release-note/release-note.repository";
+import { ReleaseNoteService } from "@modules/release-note/release-note.service";
 import { WhatsAppService } from "whatsapp";
 
 const auditRepository = new AuditRepository(prisma);
 const auditService = new AuditService(auditRepository);
 
-const mailerService = new MailerService();
-const whatsAppService = new WhatsAppService();
+const eventLogRepository = new EventLogRepository(prisma);
+const eventLogService = new EventLogService(eventLogRepository);
+
+const mailerService = new MailerService(eventLogService);
+const whatsAppService = new WhatsAppService(eventLogService);
 
 const sessionRepository = new SessionRepository(prisma);
-const sessionService = new SessionService(sessionRepository, redisClient);
+const sessionService = new SessionService(sessionRepository, redisClient, auditService);
+
+const staffRepository = new StaffRepository(prisma);
+
+const systemSettingRepository = new SystemSettingRepository(prisma);
+const systemSettingService = new SystemSettingService(systemSettingRepository, redisClient, auditService);
 
 const authRepository = new AuthRepository(prisma);
-const authService = new AuthService(authRepository, sessionService, mailerService);
+const authService = new AuthService(authRepository, sessionService, mailerService, staffRepository, auditService, systemSettingService);
 
-const healthService = new HealthService();
+const healthService = new HealthService(eventLogService);
 
 const staffRoleRepository = new StaffRoleRepository(prisma);
 
@@ -59,14 +71,13 @@ const masterService = new MasterService(masterRepository, redisClient, auditServ
 const notificationRepository = new NotificationRepository(prisma);
 const notificationService = new NotificationService(notificationRepository);
 
-const staffRepository = new StaffRepository(prisma);
+const releaseNoteRepository = new ReleaseNoteRepository(prisma);
+const releaseNoteService = new ReleaseNoteService(prisma, releaseNoteRepository, auditService, staffRepository, notificationService);
+
 const staffService = new StaffService(prisma, staffRepository, staffRoleRepository, masterRepository, auditService, mailerService, authService, notificationService);
 
 const doctorRepository = new DoctorRepository(prisma);
 const doctorService = new DoctorService(prisma, doctorRepository, staffRepository, staffRoleRepository, auditService, mailerService);
-
-const systemSettingRepository = new SystemSettingRepository(prisma);
-const systemSettingService = new SystemSettingService(systemSettingRepository, redisClient, auditService);
 
 const patientOtpRepository = new PatientOtpRepository(prisma);
 const patientOtpService = new PatientOtpService(patientOtpRepository, whatsAppService);
@@ -117,6 +128,8 @@ export const appContext = Object.freeze({
         systemSettingService,
         reportService,
         whatsAppService,
+        eventLogService,
+        releaseNoteService,
     },
 });
 

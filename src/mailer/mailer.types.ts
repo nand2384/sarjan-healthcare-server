@@ -42,4 +42,23 @@ export interface SendDoctorShiftNoticeMailOptions {
     firstName: string;
     appointmentCount: number;
     firstSlotTime: string;
+}
+
+export interface SendSecurityAlertMailOptions {
+    to: string;
+    developerFirstName: string;
+    staffName: string;
+    username: string;
+    failedAttempts: number;
+    lockedUntilFormatted: string;
+    ipAddress?: string;
+}
+
+export interface SendAccountLockedMailOptions {
+    to: string;
+    firstName: string;
+    username: string;
+    failedAttempts: number;
+    lockedUntilFormatted: string;
+    resetLink: string;
 }

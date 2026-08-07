@@ -28,6 +28,9 @@ enum AuditAction {
   RESEND_ACTIVATION_EMAIL
   CHANGE_ROLE
   FAILED_LOGIN_ATTEMPT
+  ACCOUNT_LOCKED
+  ACCOUNT_UNLOCKED
+  SESSION_REVOKED_BY_ADMIN
 }
 
 enum AuditEntityType {
@@ -42,6 +45,8 @@ enum AuditEntityType {
   MASTER_DATA
   ROLE
   SYSTEM_SETTING
+  SESSION
+  RELEASE_NOTE
 }
 
 enum DayOfWeek {
@@ -172,6 +177,10 @@ model Staff {
 
   last_login_at DateTime?
 
+  failed_login_count             Int       @default(0)
+  failed_login_window_started_at DateTime?
+  locked_until                    DateTime?
+
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
@@ -224,6 +233,8 @@ model Staff {
   reports_resolved Report[] @relation("ReportResolvedBy")
 
   report_messages_sent ReportMessage[] @relation("ReportMessageSender")
+
+  release_notes_created ReleaseNote[] @relation("ReleaseNoteCreatedBy")
 
   @@index([gender_id])
   @@index([username])
@@ -863,4 +874,59 @@ model ReportMessage {
 
   @@index([report_id])
   @@map("report_message")
+}
+
+// Unified operational-event table — replaces what used to be three
+// near-identical tables (JobRunLog/ErrorLog/DeliveryLog: each was just "an
+// event row — what happened, when, success/failure, optional detail").
+// `log_type` discriminates the kind of event; `subject` is that type's
+// primary identifier (job name / request URL / delivery recipient);
+// type-specific extras that don't need their own index live in `metadata`.
+enum EventLogType {
+  JOB_RUN
+  ERROR
+  DELIVERY
+}
+
+enum EventLogOutcome {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+model EventLog {
+  event_log_id BigInt @id @default(autoincrement())
+
+  log_type EventLogType
+  outcome  EventLogOutcome
+
+  subject String  // JOB_RUN: job name · ERROR: request URL · DELIVERY: recipient
+  message String? // failure/error detail, if any
+
+  // JOB_RUN: {} · ERROR: {request_id, method, status_code, stack} · DELIVERY: {channel, subject_or_template}
+  metadata Json?
+
+  started_at  DateTime  @default(now())
+  finished_at DateTime?
+
+  @@index([log_type])
+  @@index([outcome])
+  @@index([started_at])
+  @@map("event_log")
+}
+
+model ReleaseNote {
+  release_note_id Int @id @default(autoincrement())
+
+  version_label String
+  title         String
+  body          String
+
+  published_at DateTime @default(now())
+
+  created_by_staff_id Int
+  created_by_staff    Staff @relation("ReleaseNoteCreatedBy", fields: [created_by_staff_id], references: [staff_id])
+
+  @@index([published_at])
+  @@map("release_note")
 }

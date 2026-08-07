@@ -17,60 +17,56 @@ import { CLINIC_NAME } from "whatsapp";
  */
 export function startAppointmentReminderSweepJob() {
     // 01:00 IST daily — low traffic, well ahead of any reminder that could fire that morning.
-    schedule("0 1 * * *", async () => {
-        try {
-            const tomorrowStart = new Date();
-            tomorrowStart.setUTCHours(0, 0, 0, 0);
-            tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1);
+    schedule("appointment-reminder-sweep", "0 1 * * *", async () => {
+        const tomorrowStart = new Date();
+        tomorrowStart.setUTCHours(0, 0, 0, 0);
+        tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1);
 
-            const dayAfterStart = new Date(tomorrowStart);
-            dayAfterStart.setUTCDate(dayAfterStart.getUTCDate() + 1);
+        const dayAfterStart = new Date(tomorrowStart);
+        dayAfterStart.setUTCDate(dayAfterStart.getUTCDate() + 1);
 
-            const [appointments, hoursBefore] = await Promise.all([
-                appContext.services.receptionistService.getBookedAppointmentsForDate(tomorrowStart, dayAfterStart),
-                appContext.services.systemSettingService.getNumber(SystemSettingKey.APPOINTMENT_REMINDER_HOURS_BEFORE),
-            ]);
+        const [appointments, hoursBefore] = await Promise.all([
+            appContext.services.receptionistService.getBookedAppointmentsForDate(tomorrowStart, dayAfterStart),
+            appContext.services.systemSettingService.getNumber(SystemSettingKey.APPOINTMENT_REMINDER_HOURS_BEFORE),
+        ]);
 
-            let scheduled = 0;
-            let skipped = 0;
+        let scheduled = 0;
+        let skipped = 0;
 
-            for (const appt of appointments as any[]) {
-                if (!appt.doctor_availability?.start_time || !appt.patient?.whatsapp_number) {
-                    skipped++;
-                    continue;
-                }
-
-                const startInstant = getAppointmentStartInstantUTC(appt.appointment_date, appt.doctor_availability.start_time);
-                const reminderAt = new Date(startInstant.getTime() - hoursBefore * 60 * 60 * 1000);
-                const delayMs = reminderAt.getTime() - Date.now();
-
-                if (delayMs <= 0) {
-                    // Misconfigured large offset, or a slot earlier than the sweep expected — skip rather than fire late/immediately.
-                    appContext.logger.warn(
-                        { appointmentId: appt.appointment_id, reminderAt: reminderAt.toISOString() },
-                        "Skipping appointment reminder — computed reminder time already passed",
-                    );
-                    skipped++;
-                    continue;
-                }
-
-                await scheduleReminder(
-                    {
-                        appointmentId: appt.appointment_id,
-                        patientName: `${appt.patient.first_name} ${appt.patient.last_name}`,
-                        whatsappNumber: appt.patient.whatsapp_number,
-                        doctorName: `Dr. ${appt.doctor.first_name} ${appt.doctor.last_name}`,
-                        slotTimeFormatted: formatSlotTime12Hour(appt.doctor_availability.start_time),
-                        clinicName: CLINIC_NAME,
-                    },
-                    delayMs,
-                );
-                scheduled++;
+        for (const appt of appointments as any[]) {
+            if (!appt.doctor_availability?.start_time || !appt.patient?.whatsapp_number) {
+                skipped++;
+                continue;
             }
 
-            appContext.logger.info({ scheduled, skipped, total: appointments.length }, "Appointment reminder sweep completed");
-        } catch (error) {
-            appContext.logger.error({ err: error }, "Appointment reminder sweep job failed");
+            const startInstant = getAppointmentStartInstantUTC(appt.appointment_date, appt.doctor_availability.start_time);
+            const reminderAt = new Date(startInstant.getTime() - hoursBefore * 60 * 60 * 1000);
+            const delayMs = reminderAt.getTime() - Date.now();
+
+            if (delayMs <= 0) {
+                // Misconfigured large offset, or a slot earlier than the sweep expected — skip rather than fire late/immediately.
+                appContext.logger.warn(
+                    { appointmentId: appt.appointment_id, reminderAt: reminderAt.toISOString() },
+                    "Skipping appointment reminder — computed reminder time already passed",
+                );
+                skipped++;
+                continue;
+            }
+
+            await scheduleReminder(
+                {
+                    appointmentId: appt.appointment_id,
+                    patientName: `${appt.patient.first_name} ${appt.patient.last_name}`,
+                    whatsappNumber: appt.patient.whatsapp_number,
+                    doctorName: `Dr. ${appt.doctor.first_name} ${appt.doctor.last_name}`,
+                    slotTimeFormatted: formatSlotTime12Hour(appt.doctor_availability.start_time),
+                    clinicName: CLINIC_NAME,
+                },
+                delayMs,
+            );
+            scheduled++;
         }
+
+        appContext.logger.info({ scheduled, skipped, total: appointments.length }, "Appointment reminder sweep completed");
     });
 }

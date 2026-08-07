@@ -13,9 +13,14 @@ import { financeRouter } from "@modules/finance/finance.routes";
 import { announcementRouter } from "@modules/announcement/announcement.routes";
 import { systemSettingRouter } from "@modules/system-setting/system-setting.routes";
 import { reportRouter } from "@modules/report/report.routes";
+import { queueRouter } from "@modules/queue/queue.routes";
+import { errorLogRouter } from "@modules/error-log/error-log.routes";
+import { sessionRouter } from "@modules/session/session.routes";
+import { deliveryLogRouter } from "@modules/delivery-log/delivery-log.routes";
+import { releaseNoteRouter } from "@modules/release-note/release-note.routes";
 
 // Remove on removing redis/clear API
-import { env } from "node:process";
+import { env } from "@config";
 import { AppError, ErrorCode } from "@errors";
 import { redisClient } from "@cache";
 import { appContext } from "app.context";
@@ -39,6 +44,11 @@ router.use("/admin/finance", financeRouter);
 router.use("/announcements", announcementRouter);
 router.use("/system-settings", systemSettingRouter);
 router.use("/reports", reportRouter);
+router.use("/queue", queueRouter);
+router.use("/error-logs", errorLogRouter);
+router.use("/session", sessionRouter);
+router.use("/delivery-logs", deliveryLogRouter);
+router.use("/release-notes", releaseNoteRouter);
 
 router.get("/dev/redis/clear", async (_req, res, next) => {
     try {

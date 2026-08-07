@@ -104,6 +104,20 @@ export class StaffController {
         });
     }
 
+    public unlockStaff = async(
+        req: Request,
+        res: Response
+    ): Promise<Response<DisableStaffResponseDto>> => {
+        const staffId = Number(req.params.id);
+        const staff = await this.staffService.unlockStaff(staffId, req.auditContext);
+
+        return res.status(200).json({
+            success: true,
+            message: "Staff account unlocked successfully.",
+            data: staff,
+        });
+    }
+
     public deleteStaff = async (
         req: Request,
         res: Response,

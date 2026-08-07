@@ -1,10 +1,11 @@
-import { PrismaClient } from "@generated/prisma/client";
+import { PrismaClient, Prisma } from "@generated/prisma/client";
 import { ReportRepository, ListReportsFilters } from "./report.repository";
 import { StaffRepository } from "@modules/staff/staff.repository";
 import { NotificationService } from "@modules/notification/notification.service";
 import { CreateReportSchema, UpdateReportStatusSchema } from "./report.schema";
 import { AppError, ErrorCode } from "@errors";
 import { logger } from "@logger";
+import { WebSocketPublisher } from "websocket";
 
 const REPORT_TYPE_LABEL: Record<string, string> = {
     BUG: "Bug/Error",
@@ -26,6 +27,16 @@ export class ReportService {
         private readonly notificationService: NotificationService,
     ) {}
 
+    private async getDeveloperStaffIds(excludeStaffId?: number, tx?: Prisma.TransactionClient): Promise<number[]> {
+        const developerRoleId = await this.reportRepository.findRoleIdByName(DEVELOPER_ROLE_NAME);
+        if (!developerRoleId) {
+            logger.warn("No Developer role found — skipping report notification fan-out");
+            return [];
+        }
+        const developers = await this.staffRepository.getActiveStaffIdsByRole(developerRoleId, excludeStaffId, tx);
+        return developers.map((developer) => developer.staff_id);
+    }
+
     /**
      * Fire-and-forget from the reporter's side — no toast beyond success and no
      * persisted "my reports" list is required to find this again (the floating
@@ -35,6 +46,7 @@ export class ReportService {
      */
     public async submit(dto: CreateReportSchema, reporterStaffId: number) {
         let developerStaffIds: number[] = [];
+        let reportId = 0;
 
         const report = await this.prisma.$transaction(async (tx) => {
             const created = await this.reportRepository.create({
@@ -44,33 +56,28 @@ export class ReportService {
                 description: dto.description,
                 reported_by_staff_id: reporterStaffId,
             }, tx);
+            reportId = created.report_id;
 
-            const developerRoleId = await this.reportRepository.findRoleIdByName(DEVELOPER_ROLE_NAME);
+            const reporter = await this.staffRepository.findById(reporterStaffId, tx);
+            const reporterName = reporter ? `${reporter.first_name} ${reporter.last_name}` : "A staff member";
 
-            if (developerRoleId) {
-                const reporter = await this.staffRepository.findById(reporterStaffId, tx);
-                const reporterName = reporter ? `${reporter.first_name} ${reporter.last_name}` : "A staff member";
+            developerStaffIds = await this.getDeveloperStaffIds(reporterStaffId, tx);
 
-                const developers = await this.staffRepository.getActiveStaffIdsByRole(developerRoleId, reporterStaffId, tx);
-                developerStaffIds = developers.map((developer) => developer.staff_id);
-
-                await Promise.all(developerStaffIds.map((staffId) =>
-                    this.notificationService.notify(staffId, {
-                        title: `New ${REPORT_TYPE_LABEL[dto.report_type] ?? dto.report_type} report`,
-                        message: `From ${reporterName} — ${dto.page_label}: ${dto.description}`,
-                        type: "INFO",
-                        action_url: reportActionUrl(created.report_id),
-                    }, tx)
-                ));
-            } else {
-                logger.warn("No Developer role found — skipping report notification fan-out");
-            }
+            await Promise.all(developerStaffIds.map((staffId) =>
+                this.notificationService.notify(staffId, {
+                    title: `New ${REPORT_TYPE_LABEL[dto.report_type] ?? dto.report_type} report`,
+                    message: `From ${reporterName} — ${dto.page_label}: ${dto.description}`,
+                    type: "INFO",
+                    action_url: reportActionUrl(created.report_id),
+                }, tx)
+            ));
 
             return created;
         });
 
-        // Post-commit: live-ping every developer's bell
+        // Post-commit: live-ping every developer's bell + refresh their reports table
         developerStaffIds.forEach((staffId) => this.notificationService.pingNew(staffId));
+        WebSocketPublisher.reportUpdated(reportId, developerStaffIds);
 
         return report;
     }
@@ -113,6 +120,12 @@ export class ReportService {
             action_url: reportActionUrl(reportId),
         });
 
+        // Live-refresh the reporter's own views plus every developer's shared
+        // reports table/dashboard — not just the reporter, since any developer
+        // watching the list should see the status change without a manual refresh.
+        const developerStaffIds = await this.getDeveloperStaffIds(actorStaffId);
+        WebSocketPublisher.reportUpdated(reportId, [updated.reported_by_staff_id, ...developerStaffIds]);
+
         return updated;
     }
 
@@ -141,22 +154,16 @@ export class ReportService {
         const created = await this.reportRepository.addMessage(reportId, actorStaffId, message);
 
         const isReporterReplying = actorStaffId === report.reported_by_staff_id;
+        const developerStaffIds = await this.getDeveloperStaffIds(isReporterReplying ? actorStaffId : undefined);
 
-        let recipientStaffIds: number[] = [];
-
-        if (isReporterReplying) {
-            const developerRoleId = await this.reportRepository.findRoleIdByName(DEVELOPER_ROLE_NAME);
-            if (developerRoleId) {
-                const developers = await this.staffRepository.getActiveStaffIdsByRole(developerRoleId, actorStaffId);
-                recipientStaffIds = developers.map((developer) => developer.staff_id);
-            }
-        } else {
-            recipientStaffIds = [report.reported_by_staff_id];
-        }
+        // Bell notification goes only to the other party in this exchange —
+        // the reporter isn't a "developer" fan-out target, and a developer
+        // replying only needs to ping the reporter, not every other developer.
+        const notifyRecipientIds = isReporterReplying ? developerStaffIds : [report.reported_by_staff_id];
 
         const senderName = `${created.sender.first_name} ${created.sender.last_name}`;
 
-        await Promise.all(recipientStaffIds.map((staffId) =>
+        await Promise.all(notifyRecipientIds.map((staffId) =>
             this.notificationService.notify(staffId, {
                 title: `New reply from ${senderName}`,
                 message: `On "${report.page_label}": ${message}`,
@@ -164,6 +171,14 @@ export class ReportService {
                 action_url: reportActionUrl(reportId),
             })
         ));
+
+        // Live-refresh everyone with a stake in this report — the reporter and
+        // every developer — so the Developer Dashboard table, "Your Reports"
+        // tab, and any open conversation all reflect the new message live.
+        const allStakeholderIds = isReporterReplying
+            ? developerStaffIds
+            : [report.reported_by_staff_id, ...developerStaffIds];
+        WebSocketPublisher.reportUpdated(reportId, allStakeholderIds);
 
         return created;
     }

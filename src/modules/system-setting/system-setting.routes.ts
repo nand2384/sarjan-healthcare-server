@@ -10,6 +10,22 @@ export const systemSettingRouter = Router();
 
 const systemSettingController = new SystemSettingController(appContext.services.systemSettingService);
 
+// Registered before the generic "/:key" routes below so this literal segment
+// isn't swallowed as key="maintenance-mode".
+systemSettingRouter.get(
+    "/maintenance-mode",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.DEVELOPER),
+    systemSettingController.getMaintenanceMode,
+);
+
+systemSettingRouter.patch(
+    "/maintenance-mode",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.DEVELOPER),
+    systemSettingController.updateMaintenanceMode,
+);
+
 systemSettingRouter.get(
     "/:key",
     authMiddleware,

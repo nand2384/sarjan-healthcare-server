@@ -4,6 +4,20 @@ import { logger } from "@logger";
 import { AppError, ErrorCode } from "@errors";
 import { ZodError } from "zod";
 import { Prisma } from "@generated/prisma/client";
+import { appContext } from "app.context";
+
+function persistIfServerError(statusCode: number, error: Error, req: Request): void {
+    if (statusCode < 500) return;
+
+    appContext.services.eventLogService.recordError({
+        request_id: req.requestId,
+        method: req.method,
+        url: req.originalUrl,
+        status_code: statusCode,
+        message: error.message,
+        stack: error.stack,
+    });
+}
 
 export function errorHandler(error: Error, req: Request, res: Response, _next: NextFunction): void {
     logger.error(
@@ -93,6 +107,8 @@ export function errorHandler(error: Error, req: Request, res: Response, _next: N
     }
 
     if (error instanceof AppError) {
+        persistIfServerError(error.statusCode, error, req);
+
         res.status(error.statusCode).json({
             success: false,
             error: {
@@ -103,6 +119,8 @@ export function errorHandler(error: Error, req: Request, res: Response, _next: N
 
         return;
     }
+
+    persistIfServerError(500, error, req);
 
     res.status(500).json({
         success: false,

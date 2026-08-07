@@ -11,21 +11,17 @@ const UNREAD_RETENTION_DAYS = 90;
 
 export function startNotificationCleanupJob() {
     // 03:15 daily — off-peak, and offset from the hourly session sweep.
-    schedule("15 3 * * *", async () => {
-        try {
-            const deleted = await appContext.services.notificationService.pruneOldNotifications(
-                READ_RETENTION_DAYS,
-                UNREAD_RETENTION_DAYS,
-            );
+    schedule("notification-cleanup", "15 3 * * *", async () => {
+        const deleted = await appContext.services.notificationService.pruneOldNotifications(
+            READ_RETENTION_DAYS,
+            UNREAD_RETENTION_DAYS,
+        );
 
-            if (deleted > 0) {
-                appContext.logger.info(
-                    { deleted, readRetentionDays: READ_RETENTION_DAYS, unreadRetentionDays: UNREAD_RETENTION_DAYS },
-                    "Pruned old notifications",
-                );
-            }
-        } catch (error) {
-            appContext.logger.error({ err: error }, "Notification cleanup job failed");
+        if (deleted > 0) {
+            appContext.logger.info(
+                { deleted, readRetentionDays: READ_RETENTION_DAYS, unreadRetentionDays: UNREAD_RETENTION_DAYS },
+                "Pruned old notifications",
+            );
         }
     });
 }
