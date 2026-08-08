@@ -8,10 +8,12 @@ import { WebSocketPublisher } from "websocket";
 import { SystemSettingService } from "@modules/system-setting/system-setting.service";
 import { SystemSettingKey } from "constants/system-setting.constants";
 import { WhatsAppService, CLINIC_NAME } from "whatsapp";
+import { ReviewService } from "@modules/review/review.service";
 import { getAppointmentStartInstantUTC, getAppointmentEndInstantUTC, formatSlotTime12Hour } from "utils/appointment-time.util";
 import { scheduleReminder } from "queues/reminder.queue";
 import { scheduleNoShowCheck } from "queues/no-show.queue";
 import { logger } from "@logger";
+import { env } from "@config";
 
 type AuditContext = { performed_by_staff_id: number; ip_address?: string; user_agent?: string };
 
@@ -22,6 +24,7 @@ export class ReceptionistService {
         private readonly billingService: BillingService,
         private readonly systemSettingService: SystemSettingService,
         private readonly whatsAppService: WhatsAppService,
+        private readonly reviewService: ReviewService,
     ) {}
 
     public async getDashboardData() {
@@ -39,7 +42,13 @@ export class ReceptionistService {
             this.systemSettingService.getNumber(SystemSettingKey.CHECK_IN_WINDOW_HOURS_BEFORE),
         ]);
 
-        return ReceptionistMapper.toDashboardResponse(doctors, upcomingAppointments, stats, walkInPriorityThreshold, checkInWindowHours);
+        const patientIds = [
+            ...doctors.flatMap((d: any) => (d.doctor_appointments ?? []).map((a: any) => a.patient?.patient_id).filter(Boolean)),
+            ...upcomingAppointments.map((a: any) => a.patient?.patient_id).filter(Boolean),
+        ];
+        const pendingReviewMap = await this.reviewService.getPendingReviewMap([...new Set(patientIds)]);
+
+        return ReceptionistMapper.toDashboardResponse(doctors, upcomingAppointments, stats, walkInPriorityThreshold, checkInWindowHours, pendingReviewMap);
     }
 
     public async getAllAppointments(startDateStr?: string, endDateStr?: string) {
@@ -64,7 +73,11 @@ export class ReceptionistService {
             this.receptionistRepository.getAllAppointments(startDate, endDate),
             this.systemSettingService.getNumber(SystemSettingKey.CHECK_IN_WINDOW_HOURS_BEFORE),
         ]);
-        return appointments.map((appt: any) => ReceptionistMapper.toAppointmentDto(appt, undefined, checkInWindowHours));
+
+        const patientIds = appointments.map((a: any) => a.patient?.patient_id).filter(Boolean);
+        const pendingReviewMap = await this.reviewService.getPendingReviewMap([...new Set(patientIds)]);
+
+        return appointments.map((appt: any) => ReceptionistMapper.toAppointmentDto(appt, undefined, checkInWindowHours, pendingReviewMap));
     }
 
     public async getDoctorDashboardData(doctorId: number) {
@@ -81,7 +94,13 @@ export class ReceptionistService {
             this.systemSettingService.getNumber(SystemSettingKey.CHECK_IN_WINDOW_HOURS_BEFORE),
         ]);
 
-        return ReceptionistMapper.toDoctorDashboardResponse(doctor, upcomingAppointments, walkInPriorityThreshold, checkInWindowHours);
+        const patientIds = [
+            ...((doctor as any)?.doctor_appointments ?? []).map((a: any) => a.patient?.patient_id).filter(Boolean),
+            ...upcomingAppointments.map((a: any) => a.patient?.patient_id).filter(Boolean),
+        ];
+        const pendingReviewMap = await this.reviewService.getPendingReviewMap([...new Set(patientIds)]);
+
+        return ReceptionistMapper.toDoctorDashboardResponse(doctor, upcomingAppointments, walkInPriorityThreshold, checkInWindowHours, pendingReviewMap);
     }
 
     public async checkInPatient(appointmentId: number, createdByStaffId: number) {
@@ -228,7 +247,30 @@ export class ReceptionistService {
             WebSocketPublisher.queueUpdated({ appointmentId }, staffId, appointment.doctor_staff_id);
         }
 
+        void this.sendThankYouFeedbackRequest(appointment, result.payment.receipt_no);
+
         return result;
+    }
+
+    /** Never throws — a WhatsApp hiccup must not fail the checkout itself. */
+    private async sendThankYouFeedbackRequest(appointment: any, receiptNo: string): Promise<void> {
+        try {
+            if (!appointment?.patient?.whatsapp_number || !appointment.doctor || !appointment.review_token) {
+                return;
+            }
+
+            await this.whatsAppService.sendThankYouFeedbackRequest({
+                appointmentId: appointment.appointment_id,
+                patientName: `${appointment.patient.first_name} ${appointment.patient.last_name}`,
+                whatsappNumber: appointment.patient.whatsapp_number,
+                doctorName: `Dr. ${appointment.doctor.first_name} ${appointment.doctor.last_name}`,
+                receiptNumber: receiptNo,
+                feedbackLink: `${env.FRONTEND_URL}/feedback/${appointment.review_token}?src=link`,
+                clinicName: CLINIC_NAME,
+            });
+        } catch (error) {
+            logger.error({ err: error, appointmentId: appointment?.appointment_id }, "Failed to send thank-you/feedback WhatsApp message after checkout");
+        }
     }
 
     /** Thin passthrough used by the appointment-reminder sweep job (no mapping/pagination needed there). */

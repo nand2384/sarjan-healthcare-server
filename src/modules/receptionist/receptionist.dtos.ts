@@ -17,6 +17,7 @@ export interface AppointmentDto {
     check_in_closes_at?: string;
     reschedule_count: number;
     ui_doctor_name: string | null;
+    pending_review: { appointment_id: number; review_token: string } | null;
     patient: {
         patient_id: number;
         first_name: string;

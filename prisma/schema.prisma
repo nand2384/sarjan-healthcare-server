@@ -236,6 +236,8 @@ model Staff {
 
   release_notes_created ReleaseNote[] @relation("ReleaseNoteCreatedBy")
 
+  reviews_received Review[] @relation("ReviewDoctor")
+
   @@index([gender_id])
   @@index([username])
   @@index([email])
@@ -304,6 +306,7 @@ model Patient {
 
   test_orders TestOrder[]
   payments    Payment[]
+  reviews     Review[]
 
   otp_verifications PatientOtpVerification[]
 
@@ -526,6 +529,12 @@ model Appointment {
   // just a display counter.
   reschedule_count Int @default(0)
 
+  // Populated for every appointment at creation, same @default(cuid())
+  // convention as Session.session_id — only ever sent to the patient once
+  // checkout completes (see ReceptionistService.checkout), so an unused
+  // token on a cancelled/no-show appointment is harmless.
+  review_token String @unique @default(cuid())
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
@@ -547,6 +556,7 @@ model Appointment {
 
   test_orders TestOrder[]
   payment     Payment?
+  review      Review?
 
   @@index([patient_id])
   @@index([doctor_staff_id])
@@ -933,4 +943,77 @@ model ReleaseNote {
 
   @@index([published_at])
   @@map("release_note")
+}
+
+// Admin-manageable rating parameters patients score 1-5 on — deliberately its
+// own table (not the generic MainMaster/ValueMaster pattern) since it needs
+// display_order and a description meaningfully tied to feedback specifically,
+// and never a hard delete (is_active soft-delete, same convention as
+// ValueMaster) so historical ReviewRating rows keep pointing at a real row.
+model ReviewCriterion {
+  criterion_id Int @id @default(autoincrement())
+
+  label       String
+  description String?
+
+  display_order Int     @default(0)
+  is_active     Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  ratings ReviewRating[]
+
+  @@map("review_criterion")
+}
+
+enum ReviewSource {
+  LINK
+  RECEPTIONIST_QR
+  PATIENT_DASHBOARD
+}
+
+model Review {
+  review_id Int @id @default(autoincrement())
+
+  appointment_id Int @unique
+  patient_id     Int
+  // Denormalized from the appointment at submission time — lets the admin
+  // reviews list filter/query by doctor without joining through Appointment.
+  doctor_staff_id Int
+
+  message String?
+
+  // Patient's own choice at submission; admin can flip it later from the
+  // Patient Reviews page without touching the patient's original answer semantics.
+  is_public Boolean @default(false)
+
+  source ReviewSource
+
+  submitted_at DateTime @default(now())
+
+  appointment Appointment @relation(fields: [appointment_id], references: [appointment_id])
+  patient     Patient     @relation(fields: [patient_id], references: [patient_id])
+  doctor      Staff       @relation("ReviewDoctor", fields: [doctor_staff_id], references: [staff_id])
+
+  ratings ReviewRating[]
+
+  @@index([patient_id])
+  @@index([doctor_staff_id])
+  @@index([is_public])
+  @@map("review")
+}
+
+model ReviewRating {
+  review_rating_id Int @id @default(autoincrement())
+
+  review_id    Int
+  criterion_id Int
+  stars        Int // 1-5
+
+  review    Review          @relation(fields: [review_id], references: [review_id])
+  criterion ReviewCriterion @relation(fields: [criterion_id], references: [criterion_id])
+
+  @@unique([review_id, criterion_id])
+  @@map("review_rating")
 }

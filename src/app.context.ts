@@ -39,6 +39,10 @@ import { EventLogRepository } from "@modules/event-log/event-log.repository";
 import { EventLogService } from "@modules/event-log/event-log.service";
 import { ReleaseNoteRepository } from "@modules/release-note/release-note.repository";
 import { ReleaseNoteService } from "@modules/release-note/release-note.service";
+import { ReviewCriterionRepository } from "@modules/review-criterion/review-criterion.repository";
+import { ReviewCriterionService } from "@modules/review-criterion/review-criterion.service";
+import { ReviewRepository } from "@modules/review/review.repository";
+import { ReviewService } from "@modules/review/review.service";
 import { WhatsAppService } from "whatsapp";
 
 const auditRepository = new AuditRepository(prisma);
@@ -74,6 +78,12 @@ const notificationService = new NotificationService(notificationRepository);
 const releaseNoteRepository = new ReleaseNoteRepository(prisma);
 const releaseNoteService = new ReleaseNoteService(prisma, releaseNoteRepository, auditService, staffRepository, notificationService);
 
+const reviewCriterionRepository = new ReviewCriterionRepository(prisma);
+const reviewCriterionService = new ReviewCriterionService(reviewCriterionRepository);
+
+const reviewRepository = new ReviewRepository(prisma);
+const reviewService = new ReviewService(reviewRepository, reviewCriterionService);
+
 const staffService = new StaffService(prisma, staffRepository, staffRoleRepository, masterRepository, auditService, mailerService, authService, notificationService);
 
 const doctorRepository = new DoctorRepository(prisma);
@@ -92,7 +102,7 @@ const billingRepository = new BillingRepository(prisma);
 const billingService = new BillingService(billingRepository, auditService, mailerService);
 
 const receptionistRepository = new ReceptionistRepository(prisma);
-const receptionistService = new ReceptionistService(receptionistRepository, billingRepository, billingService, systemSettingService, whatsAppService);
+const receptionistService = new ReceptionistService(receptionistRepository, billingRepository, billingService, systemSettingService, whatsAppService, reviewService);
 
 const financeRepository = new FinanceRepository(prisma);
 const financeService = new FinanceService(financeRepository);
@@ -130,6 +140,8 @@ export const appContext = Object.freeze({
         whatsAppService,
         eventLogService,
         releaseNoteService,
+        reviewCriterionService,
+        reviewService,
     },
 });
 

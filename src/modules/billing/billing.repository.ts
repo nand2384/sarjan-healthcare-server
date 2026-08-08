@@ -181,6 +181,9 @@ export class BillingRepository {
                 patient_id: true,
                 doctor_staff_id: true,
                 appointment_status_id: true,
+                review_token: true,
+                patient: { select: { first_name: true, last_name: true, whatsapp_number: true } },
+                doctor: { select: { first_name: true, last_name: true } },
             }
         });
     }

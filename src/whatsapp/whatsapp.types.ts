@@ -22,6 +22,16 @@ export interface SendAppointmentRescheduledOptions {
     clinicName: string;
 }
 
+export interface SendThankYouFeedbackRequestOptions {
+    appointmentId: number;
+    patientName: string;
+    whatsappNumber: string;
+    doctorName: string;
+    receiptNumber: string;
+    feedbackLink: string;
+    clinicName: string;
+}
+
 /**
  * Named once here so renaming a template after Meta approval (their exact
  * approved name may differ from what's submitted) is a one-line change instead
@@ -31,6 +41,7 @@ export const WhatsAppTemplateName = {
     APPOINTMENT_REMINDER: "appointment_reminder",
     OTP_AUTHENTICATION: "otp_authentication",
     APPOINTMENT_RESCHEDULED: "appointment_rescheduled",
+    APPOINTMENT_THANK_YOU: "appointment_thank_you",
 } as const;
 
 export const CLINIC_NAME = "Sarjan Healthcare";

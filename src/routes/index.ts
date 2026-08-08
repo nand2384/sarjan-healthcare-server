@@ -18,6 +18,8 @@ import { errorLogRouter } from "@modules/error-log/error-log.routes";
 import { sessionRouter } from "@modules/session/session.routes";
 import { deliveryLogRouter } from "@modules/delivery-log/delivery-log.routes";
 import { releaseNoteRouter } from "@modules/release-note/release-note.routes";
+import { reviewCriterionRouter } from "@modules/review-criterion/review-criterion.routes";
+import { reviewRouter, publicReviewRouter } from "@modules/review/review.routes";
 
 // Remove on removing redis/clear API
 import { env } from "@config";
@@ -49,6 +51,9 @@ router.use("/error-logs", errorLogRouter);
 router.use("/session", sessionRouter);
 router.use("/delivery-logs", deliveryLogRouter);
 router.use("/release-notes", releaseNoteRouter);
+router.use("/review-criteria", reviewCriterionRouter);
+router.use("/reviews", reviewRouter);
+router.use("/public", publicReviewRouter);
 
 router.get("/dev/redis/clear", async (_req, res, next) => {
     try {
