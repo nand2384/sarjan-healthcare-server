@@ -23,5 +23,7 @@ export function startNotificationCleanupJob() {
                 "Pruned old notifications",
             );
         }
+
+        return { deleted, readRetentionDays: READ_RETENTION_DAYS, unreadRetentionDays: UNREAD_RETENTION_DAYS };
     });
 }

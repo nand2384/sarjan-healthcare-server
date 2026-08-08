@@ -58,5 +58,7 @@ export function startDoctorShiftNoticeJob() {
         }
 
         appContext.logger.info({ sent, doctors: byDoctor.size }, "Doctor shift notice sweep completed");
+
+        return { emailsSent: sent, doctorsWithAppointments: byDoctor.size, totalAppointmentsTomorrow: appointments.length };
     });
 }

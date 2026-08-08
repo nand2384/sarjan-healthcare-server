@@ -13,6 +13,7 @@ export interface CreateEventLogData {
 export interface UpdateEventLogData {
     outcome: EventLogOutcome;
     message?: string;
+    metadata?: Prisma.InputJsonValue;
     finished_at: Date;
 }
 

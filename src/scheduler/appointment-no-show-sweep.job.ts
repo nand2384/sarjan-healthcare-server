@@ -49,5 +49,7 @@ export function startAppointmentNoShowSweepJob() {
         }
 
         appContext.logger.info({ scheduled, skipped, total: appointments.length }, "Appointment no-show sweep completed");
+
+        return { scheduled, skipped, total: appointments.length };
     });
 }

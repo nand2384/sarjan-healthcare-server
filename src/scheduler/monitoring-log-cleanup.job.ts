@@ -18,5 +18,7 @@ export function startMonitoringLogCleanupJob() {
             { errorLogsDeleted, deliveryLogsDeleted, jobRunsDeleted },
             "Monitoring log cleanup completed",
         );
+
+        return { errorLogsDeleted, deliveryLogsDeleted, jobRunsDeleted };
     });
 }

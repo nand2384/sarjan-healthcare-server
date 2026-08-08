@@ -68,5 +68,7 @@ export function startAppointmentReminderSweepJob() {
         }
 
         appContext.logger.info({ scheduled, skipped, total: appointments.length }, "Appointment reminder sweep completed");
+
+        return { scheduled, skipped, total: appointments.length };
     });
 }

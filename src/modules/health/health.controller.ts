@@ -23,6 +23,15 @@ export class HealthController {
         });
     };
 
+    public jobHistory = async (req: Request, res: Response) => {
+        const history = await this.healthService.getJobHistory(String(req.params.jobName));
+
+        return res.status(200).json({
+            success: true,
+            data: history,
+        });
+    };
+
     public version = async (_req: Request, res: Response) => {
         return res.status(200).json({
             success: true,

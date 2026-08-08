@@ -11,4 +11,5 @@ const healthController = new HealthController(appContext.services.healthService)
 
 healthRouter.get("/", healthController.check);
 healthRouter.get("/jobs", authMiddleware, roleMiddleware(USER_ROLE.DEVELOPER), healthController.jobs);
+healthRouter.get("/jobs/:jobName/history", authMiddleware, roleMiddleware(USER_ROLE.DEVELOPER), healthController.jobHistory);
 healthRouter.get("/version", authMiddleware, roleMiddleware(USER_ROLE.DEVELOPER), healthController.version);

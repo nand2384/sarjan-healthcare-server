@@ -1,4 +1,5 @@
 import { logger } from "@logger";
+import { Prisma } from "@generated/prisma/client";
 import { EventLogRepository } from "./event-log.repository";
 
 const MAX_STACK_LENGTH = 4000;
@@ -32,6 +33,8 @@ interface JobRunRow {
     started_at: Date;
     finished_at: Date | null;
     error_message: string | null;
+    /** What the job actually did — e.g. { scheduled: 5, skipped: 2 }, { deleted: 12 }. Whatever shape that job's task() returns. Null for older rows recorded before this existed, or a job that returned nothing. */
+    details: Record<string, unknown> | null;
 }
 
 /**
@@ -61,10 +64,14 @@ export class EventLogService {
         }
     }
 
-    public async recordSuccess(eventLogId: bigint | undefined): Promise<void> {
+    public async recordSuccess(eventLogId: bigint | undefined, details?: Record<string, unknown>): Promise<void> {
         if (eventLogId === undefined) return;
         try {
-            await this.eventLogRepository.update(eventLogId, { outcome: "SUCCESS", finished_at: new Date() });
+            await this.eventLogRepository.update(eventLogId, {
+                outcome: "SUCCESS",
+                finished_at: new Date(),
+                ...(details && { metadata: details as Prisma.InputJsonValue }),
+            });
         } catch (error) {
             logger.error({ err: error, eventLogId: eventLogId.toString() }, "Failed to record job run success");
         }
@@ -93,7 +100,7 @@ export class EventLogService {
         return rows.map((row) => this.toJobRunRow(row));
     }
 
-    private toJobRunRow(row: { event_log_id: bigint; subject: string; outcome: string; started_at: Date; finished_at: Date | null; message: string | null }): JobRunRow {
+    private toJobRunRow(row: { event_log_id: bigint; subject: string; outcome: string; started_at: Date; finished_at: Date | null; message: string | null; metadata?: unknown }): JobRunRow {
         return {
             job_run_log_id: row.event_log_id.toString(),
             job_name: row.subject,
@@ -101,6 +108,7 @@ export class EventLogService {
             started_at: row.started_at,
             finished_at: row.finished_at,
             error_message: row.message,
+            details: (row.metadata as Record<string, unknown> | null) ?? null,
         };
     }
 

@@ -9,8 +9,8 @@ export const queueRouter = Router();
 const queueController = new QueueController(appContext.services.eventLogService);
 
 queueRouter.get(
-    "/reminder/status",
+    "/status",
     authMiddleware,
     roleMiddleware(USER_ROLE.DEVELOPER),
-    queueController.reminderStatus,
+    queueController.status,
 );

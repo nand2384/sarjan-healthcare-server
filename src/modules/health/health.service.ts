@@ -26,6 +26,11 @@ export class HealthService {
         return this.eventLogService.getLatestPerJob();
     }
 
+    /** Recent runs for one specific job (by its subject/job_name) — powers the "view history" drill-down from the System Health scheduled-jobs table. */
+    public async getJobHistory(jobName: string, limit = 20) {
+        return this.eventLogService.getRecentRunsForJob(jobName, limit);
+    }
+
     public getVersionInfo() {
         return {
             version: env.APP_VERSION ?? buildInfo.fallbackVersion,

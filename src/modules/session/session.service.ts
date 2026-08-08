@@ -119,7 +119,8 @@ export class SessionService {
     }
 
     public async cleanupExpiredSessions() {
-        await this.sessionRepository.deleteExpiredSessions();
+        const result = await this.sessionRepository.deleteExpiredSessions();
+        return result.count;
     }
 
     private describeDevice(userAgent: string | null): string {
