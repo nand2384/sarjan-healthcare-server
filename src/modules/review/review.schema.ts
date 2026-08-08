@@ -17,11 +17,14 @@ export const submitReviewSchema = z.object({
 export const getReviewsSchema = z.object({
     page: z.coerce.number().min(1).optional(),
     limit: z.coerce.number().min(1).max(100).optional(),
-    is_public: z.coerce.boolean().optional(),
+    // z.coerce.boolean() is a trap for query strings — Boolean("false") is
+    // true in JS, so any non-empty value (including the literal string
+    // "false") would coerce to true. Compare the raw string instead.
+    is_public: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
     doctor_id: z.coerce.number().int().positive().optional(),
     search: z.string().trim().optional(),
 });
 
-export const updateReviewVisibilitySchema = z.object({
-    is_public: z.boolean(),
+export const updateReviewApprovalSchema = z.object({
+    is_approved_for_display: z.boolean(),
 });

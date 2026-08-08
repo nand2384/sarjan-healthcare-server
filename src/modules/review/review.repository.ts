@@ -97,8 +97,8 @@ export class ReviewRepository {
         return this.prisma.review.findUnique({ where: { review_id: id }, include: reviewInclude });
     }
 
-    public async updateVisibility(id: number, isPublic: boolean) {
-        return this.prisma.review.update({ where: { review_id: id }, data: { is_public: isPublic } });
+    public async updateApprovalForDisplay(id: number, approved: boolean) {
+        return this.prisma.review.update({ where: { review_id: id }, data: { is_approved_for_display: approved } });
     }
 
     public async deleteTx(id: number) {
@@ -108,10 +108,16 @@ export class ReviewRepository {
         });
     }
 
-    /** Latest public reviews for the landing page's testimonials section. */
+    /**
+     * Latest public reviews for the landing page's testimonials section.
+     * Requires BOTH the patient's consent (is_public) AND the admin's
+     * editorial approval (is_approved_for_display) — patient consent alone
+     * is never sufficient, since a consented-but-negative review shouldn't
+     * surface just because the patient said it could.
+     */
     public async findPublicRecent(limit: number) {
         return this.prisma.review.findMany({
-            where: { is_public: true, message: { not: null } },
+            where: { is_public: true, is_approved_for_display: true, message: { not: null } },
             include: reviewInclude,
             orderBy: { submitted_at: "desc" },
             take: limit,

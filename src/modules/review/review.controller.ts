@@ -21,8 +21,8 @@ export class ReviewController {
         return res.status(200).json({ success: true, data: result.data, pagination: result.pagination });
     };
 
-    public updateVisibility = async (req: Request, res: Response) => {
-        const review = await this.reviewService.updateVisibility(Number(req.params.id), req.body.is_public);
+    public updateApproval = async (req: Request, res: Response) => {
+        const review = await this.reviewService.updateApprovalForDisplay(Number(req.params.id), req.body.is_approved_for_display);
         return res.status(200).json({ success: true, message: "Review updated.", data: review });
     };
 

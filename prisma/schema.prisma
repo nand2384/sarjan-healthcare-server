@@ -984,9 +984,14 @@ model Review {
 
   message String?
 
-  // Patient's own choice at submission; admin can flip it later from the
-  // Patient Reviews page without touching the patient's original answer semantics.
+  // Patient's own consent at submission — "I'm OK with this being shown
+  // publicly." Immutable by admin; it's the patient's answer, not a setting.
   is_public Boolean @default(false)
+
+  // Admin's separate editorial choice to actually feature this review on the
+  // public site. Only meaningful (and only settable true) when is_public is
+  // also true — patient consent is necessary but not sufficient for display.
+  is_approved_for_display Boolean @default(false)
 
   source ReviewSource
 

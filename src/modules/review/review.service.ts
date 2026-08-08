@@ -2,6 +2,7 @@ import { AppError, ErrorCode } from "@errors";
 import { ReviewSource } from "@generated/prisma/client";
 import { ReviewRepository, ReviewFilters } from "./review.repository";
 import { ReviewCriterionService } from "@modules/review-criterion/review-criterion.service";
+import { WebSocketPublisher } from "websocket";
 
 export interface SubmitReviewData {
     message?: string;
@@ -67,7 +68,7 @@ export class ReviewService {
             }
         }
 
-        return this.reviewRepository.createTx({
+        const review = await this.reviewRepository.createTx({
             appointment_id: appointment.appointment_id,
             patient_id: appointment.patient_id,
             doctor_staff_id: appointment.doctor_staff_id,
@@ -76,6 +77,15 @@ export class ReviewService {
             source: data.source,
             ratings: data.ratings,
         });
+
+        // No staff member triggered this — it's patient-initiated — so there's
+        // no sender to exclude from the broadcast. Reuses the same event the
+        // receptionist dashboard already listens to for queue changes, so an
+        // open dashboard/drawer drops the "feedback pending" badge live
+        // instead of only on the next unrelated refetch.
+        WebSocketPublisher.queueUpdated({ appointmentId: appointment.appointment_id }, -1, appointment.doctor_staff_id);
+
+        return review;
     }
 
     public async getReviews(filters: ReviewFilters) {
@@ -88,12 +98,18 @@ export class ReviewService {
         return { data: rows, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
     }
 
-    public async updateVisibility(id: number, isPublic: boolean) {
+    public async updateApprovalForDisplay(id: number, approved: boolean) {
         const existing = await this.reviewRepository.findById(id);
         if (!existing) {
             throw new AppError(404, ErrorCode.NOT_FOUND, "Review not found");
         }
-        return this.reviewRepository.updateVisibility(id, isPublic);
+        // The patient's consent is a hard gate, not just a default — admin can
+        // never publish a review the patient didn't agree to make public,
+        // however positive it is.
+        if (approved && !existing.is_public) {
+            throw new AppError(400, ErrorCode.BAD_REQUEST, "This patient didn't consent to their review being shown publicly.");
+        }
+        return this.reviewRepository.updateApprovalForDisplay(id, approved);
     }
 
     public async delete(id: number) {
