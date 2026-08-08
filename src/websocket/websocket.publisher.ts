@@ -1,6 +1,6 @@
 import { USER_ROLE } from "common/common.schema";
 import { getWebSocketService } from "server.instance";
-import { SocketEvent } from "./websocket.constants";
+import { SocketEvent, SocketRoom } from "./websocket.constants";
 
 export class WebSocketPublisher {
     /**
@@ -86,5 +86,28 @@ export class WebSocketPublisher {
      */
     static maintenanceModeChanged(enabled: boolean): void {
         getWebSocketService().broadcast(SocketEvent.MAINTENANCE_MODE_CHANGED, { enabled });
+    }
+
+    /**
+     * Tells a specific session's client it's been revoked (admin force-revoke,
+     * "sign out other devices", or a staff-wide revoke) so it logs itself out
+     * immediately instead of only discovering this on its next request.
+     *
+     * The transport is force-closed a couple seconds later as a fallback for
+     * a connection that never acts on the event (no listener mounted,
+     * backgrounded tab) — deliberately NOT immediate. `disconnectSockets`
+     * closes the raw transport, which races the just-emitted event packet
+     * over the same connection; closing first (or simultaneously) can win
+     * that race and tear the socket down before the client ever receives the
+     * event, and a server-initiated disconnect also disables socket.io's
+     * client-side auto-reconnect by design — so a losing race leaves the
+     * client stuck disconnected with the event lost. The delay gives the
+     * primary event-driven path time to actually land first.
+     */
+    static sessionRevoked(sessionId: string): void {
+        const websocketService = getWebSocketService();
+        const room = `${SocketRoom.SESSION}:${sessionId}`;
+        websocketService.emitToRoom(room, SocketEvent.SESSION_REVOKED, {});
+        setTimeout(() => websocketService.disconnectRoom(room), 3000);
     }
 }

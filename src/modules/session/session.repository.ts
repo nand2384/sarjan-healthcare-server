@@ -38,8 +38,13 @@ export class SessionRepository {
         });
     }
 
+    // deleteMany (not delete) — must be idempotent. Redis is the actual source
+    // of truth for "is this session live"; its Postgres row can already be
+    // gone (e.g. pruned by the expired-session cleanup job on a different
+    // TTL) while the session is still valid, and callers like
+    // forceRevokeSession must not fail just because that row is missing.
     public async deleteSession(sessionId: string) {
-        return await this.prisma.session.delete({
+        return await this.prisma.session.deleteMany({
             where: {
                 session_id: sessionId,
             },

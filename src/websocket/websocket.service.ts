@@ -23,6 +23,11 @@ export class WebSocketService {
         this.io.to(room).emit(event, payload);
     }
 
+    /** Forcibly closes the underlying transport for every socket in a room — used alongside an emit so a revoked session can't keep working even if the client doesn't act on the event. */
+    disconnectRoom(room: string): void {
+        this.io.in(room).disconnectSockets(true);
+    }
+
     broadcast<T>(event: string, payload: T): void {
         this.io.emit(event, payload);
     }

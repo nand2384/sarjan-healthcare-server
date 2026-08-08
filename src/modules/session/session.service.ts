@@ -8,6 +8,7 @@ import { UAParser } from "ua-parser-js";
 import { logger } from "@logger";
 import { AuditService } from "@modules/audit/audit.service";
 import { AuditAction, AuditEntityType } from "@generated/prisma/client";
+import { WebSocketPublisher } from "websocket";
 
 export class SessionService {
     constructor(
@@ -161,6 +162,7 @@ export class SessionService {
         const session = await this.sessionRepository.findSessionById(sessionId);
 
         await this.deleteSession(sessionId);
+        WebSocketPublisher.sessionRevoked(sessionId);
 
         await this.auditService.log({
             ...auditContext,
@@ -178,6 +180,7 @@ export class SessionService {
         // 2. Delete from Redis
         for (const session of otherSessions) {
             await this.redisClient.del(`session:${session.session_id}`);
+            WebSocketPublisher.sessionRevoked(session.session_id);
         }
 
         // 3. Delete from Postgres
@@ -191,6 +194,7 @@ export class SessionService {
         // 2. Delete from Redis
         for (const session of allSessions) {
             await this.redisClient.del(`session:${session.session_id}`);
+            WebSocketPublisher.sessionRevoked(session.session_id);
         }
 
         // 3. Delete from Postgres

@@ -1,6 +1,7 @@
 export enum SocketRoom {
     STAFF = "staff",
     ROLE = "role",
+    SESSION = "session",
 }
 
 export enum SocketEvent {
@@ -10,6 +11,7 @@ export enum SocketEvent {
     REPORT_UPDATED = "report.updated",
     ROLES_UPDATED = "staff.roles-updated",
     MAINTENANCE_MODE_CHANGED = "system.maintenance-mode-changed",
+    SESSION_REVOKED = "session.revoked",
 }
 
 export enum UserRole {
