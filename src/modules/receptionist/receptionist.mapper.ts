@@ -174,6 +174,9 @@ export class ReceptionistMapper {
             isPriority: appt.is_priority || false,
             joined_at: appt.queue_info?.created_at ? new Date(appt.queue_info.created_at).toISOString() : undefined,
             status_started_at: appt.status_started_at,
+            pendingReview: appt.pending_review
+                ? { appointmentId: appt.pending_review.appointment_id, reviewToken: appt.pending_review.review_token }
+                : null,
         };
     }
 
