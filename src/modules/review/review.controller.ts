@@ -21,9 +21,14 @@ export class ReviewController {
         return res.status(200).json({ success: true, data: result.data, pagination: result.pagination });
     };
 
-    public updateApproval = async (req: Request, res: Response) => {
-        const review = await this.reviewService.updateApprovalForDisplay(Number(req.params.id), req.body.is_approved_for_display);
+    public updateModeration = async (req: Request, res: Response) => {
+        const review = await this.reviewService.updateModerationStatus(Number(req.params.id), req.body.status);
         return res.status(200).json({ success: true, message: "Review updated.", data: review });
+    };
+
+    public summary = async (_req: Request, res: Response) => {
+        const summary = await this.reviewService.getModerationSummary();
+        return res.status(200).json({ success: true, data: summary });
     };
 
     public remove = async (req: Request, res: Response) => {

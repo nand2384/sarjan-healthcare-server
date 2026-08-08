@@ -1,7 +1,9 @@
 import { AppError, ErrorCode } from "@errors";
-import { ReviewSource } from "@generated/prisma/client";
+import { ReviewSource, ReviewModerationStatus } from "@generated/prisma/client";
 import { ReviewRepository, ReviewFilters } from "./review.repository";
 import { ReviewCriterionService } from "@modules/review-criterion/review-criterion.service";
+import { SystemSettingService } from "@modules/system-setting/system-setting.service";
+import { SystemSettingKey } from "constants/system-setting.constants";
 import { WebSocketPublisher } from "websocket";
 
 export interface SubmitReviewData {
@@ -15,6 +17,7 @@ export class ReviewService {
     constructor(
         private readonly reviewRepository: ReviewRepository,
         private readonly reviewCriterionService: ReviewCriterionService,
+        private readonly systemSettingService: SystemSettingService,
     ) {}
 
     public async getInvite(token: string) {
@@ -98,7 +101,7 @@ export class ReviewService {
         return { data: rows, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
     }
 
-    public async updateApprovalForDisplay(id: number, approved: boolean) {
+    public async updateModerationStatus(id: number, status: ReviewModerationStatus) {
         const existing = await this.reviewRepository.findById(id);
         if (!existing) {
             throw new AppError(404, ErrorCode.NOT_FOUND, "Review not found");
@@ -106,10 +109,15 @@ export class ReviewService {
         // The patient's consent is a hard gate, not just a default — admin can
         // never publish a review the patient didn't agree to make public,
         // however positive it is.
-        if (approved && !existing.is_public) {
+        if (status === "APPROVED" && !existing.is_public) {
             throw new AppError(400, ErrorCode.BAD_REQUEST, "This patient didn't consent to their review being shown publicly.");
         }
-        return this.reviewRepository.updateApprovalForDisplay(id, approved);
+        return this.reviewRepository.updateModerationStatus(id, status);
+    }
+
+    /** KPI counts + average rating for the admin Patient Reviews page header. */
+    public async getModerationSummary() {
+        return this.reviewRepository.getModerationSummary();
     }
 
     public async delete(id: number) {
@@ -120,7 +128,8 @@ export class ReviewService {
         return this.reviewRepository.deleteTx(id);
     }
 
-    public async getPublicRecent(limit = 12) {
+    public async getPublicRecent() {
+        const limit = await this.systemSettingService.getNumber(SystemSettingKey.PUBLIC_REVIEWS_DISPLAY_LIMIT);
         const reviews = await this.reviewRepository.findPublicRecent(limit);
         return reviews.map((review) => {
             const avg = review.ratings.length > 0

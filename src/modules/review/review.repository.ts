@@ -1,4 +1,4 @@
-import { PrismaClient, ReviewSource } from "@generated/prisma/client";
+import { PrismaClient, ReviewSource, ReviewModerationStatus } from "@generated/prisma/client";
 
 export interface CreateReviewData {
     appointment_id: number;
@@ -14,6 +14,7 @@ export interface ReviewFilters {
     page?: number;
     limit?: number;
     is_public?: boolean;
+    status?: ReviewModerationStatus;
     doctor_id?: number;
     search?: string;
 }
@@ -64,9 +65,10 @@ export class ReviewRepository {
     }
 
     private buildWhere(filters: ReviewFilters) {
-        const { is_public, doctor_id, search } = filters;
+        const { is_public, status, doctor_id, search } = filters;
         return {
             ...(is_public !== undefined && { is_public }),
+            ...(status && { moderation_status: status }),
             ...(doctor_id && { doctor_staff_id: doctor_id }),
             ...(search && {
                 OR: [
@@ -97,8 +99,8 @@ export class ReviewRepository {
         return this.prisma.review.findUnique({ where: { review_id: id }, include: reviewInclude });
     }
 
-    public async updateApprovalForDisplay(id: number, approved: boolean) {
-        return this.prisma.review.update({ where: { review_id: id }, data: { is_approved_for_display: approved } });
+    public async updateModerationStatus(id: number, status: ReviewModerationStatus) {
+        return this.prisma.review.update({ where: { review_id: id }, data: { moderation_status: status } });
     }
 
     public async deleteTx(id: number) {
@@ -111,17 +113,35 @@ export class ReviewRepository {
     /**
      * Latest public reviews for the landing page's testimonials section.
      * Requires BOTH the patient's consent (is_public) AND the admin's
-     * editorial approval (is_approved_for_display) — patient consent alone
-     * is never sufficient, since a consented-but-negative review shouldn't
-     * surface just because the patient said it could.
+     * moderation approval (moderation_status = APPROVED) — patient consent
+     * alone is never sufficient, since a consented-but-negative review
+     * shouldn't surface just because the patient said it could.
+     *
+     * `limit` is the configurable display cap (PUBLIC_REVIEWS_DISPLAY_LIMIT)
+     * — eviction when the cap is exceeded is purely a query-time effect of
+     * ordering by submitted_at desc + take(limit), so approving a new review
+     * naturally pushes the oldest currently-shown one off the end without any
+     * separate bookkeeping.
      */
     public async findPublicRecent(limit: number) {
         return this.prisma.review.findMany({
-            where: { is_public: true, is_approved_for_display: true, message: { not: null } },
+            where: { is_public: true, moderation_status: "APPROVED", message: { not: null } },
             include: reviewInclude,
             orderBy: { submitted_at: "desc" },
             take: limit,
         });
+    }
+
+    /** KPI counts for the admin Patient Reviews page — pending/approved/rejected are scoped to consented reviews only, since declined-consent ones never enter the moderation workflow. */
+    public async getModerationSummary() {
+        const [pending, approved, rejected, privateCount, avg] = await Promise.all([
+            this.prisma.review.count({ where: { is_public: true, moderation_status: "PENDING" } }),
+            this.prisma.review.count({ where: { is_public: true, moderation_status: "APPROVED" } }),
+            this.prisma.review.count({ where: { is_public: true, moderation_status: "REJECTED" } }),
+            this.prisma.review.count({ where: { is_public: false } }),
+            this.prisma.reviewRating.aggregate({ _avg: { stars: true } }),
+        ]);
+        return { pending, approved, rejected, privateCount, avgRating: avg._avg.stars ?? 0 };
     }
 
     /**

@@ -21,10 +21,11 @@ export const getReviewsSchema = z.object({
     // true in JS, so any non-empty value (including the literal string
     // "false") would coerce to true. Compare the raw string instead.
     is_public: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
+    status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
     doctor_id: z.coerce.number().int().positive().optional(),
     search: z.string().trim().optional(),
 });
 
-export const updateReviewApprovalSchema = z.object({
-    is_approved_for_display: z.boolean(),
+export const updateReviewModerationSchema = z.object({
+    status: z.enum(["PENDING", "APPROVED", "REJECTED"]),
 });
