@@ -4,7 +4,10 @@ import { ReviewRepository, ReviewFilters } from "./review.repository";
 import { ReviewCriterionService } from "@modules/review-criterion/review-criterion.service";
 import { SystemSettingService } from "@modules/system-setting/system-setting.service";
 import { SystemSettingKey } from "constants/system-setting.constants";
+import { StaffRepository } from "@modules/staff/staff.repository";
+import { NotificationService } from "@modules/notification/notification.service";
 import { WebSocketPublisher } from "websocket";
+import { logger } from "@logger";
 
 export interface SubmitReviewData {
     message?: string;
@@ -18,6 +21,8 @@ export class ReviewService {
         private readonly reviewRepository: ReviewRepository,
         private readonly reviewCriterionService: ReviewCriterionService,
         private readonly systemSettingService: SystemSettingService,
+        private readonly staffRepository: StaffRepository,
+        private readonly notificationService: NotificationService,
     ) {}
 
     public async getInvite(token: string) {
@@ -88,7 +93,35 @@ export class ReviewService {
         // instead of only on the next unrelated refetch.
         WebSocketPublisher.queueUpdated({ appointmentId: appointment.appointment_id }, -1, appointment.doctor_staff_id);
 
+        // Only consented reviews ever enter the moderation queue — nothing to
+        // approve for one the patient declined to make public, so no point
+        // paging admins about it.
+        if (data.is_public) {
+            void this.notifyAdminsOfPendingReview(appointment.patient);
+        }
+
         return review;
+    }
+
+    /** Never throws — a notification hiccup must not fail the patient's submission. */
+    private async notifyAdminsOfPendingReview(patient: { first_name: string; last_name: string } | null): Promise<void> {
+        try {
+            const adminIds = await this.staffRepository.getActiveAdminIds();
+            const patientName = patient ? `${patient.first_name} ${patient.last_name}` : "A patient";
+
+            await Promise.all(
+                adminIds.map((adminId) =>
+                    this.notificationService.notify(adminId, {
+                        title: "New review pending approval",
+                        message: `${patientName} submitted a review awaiting your approval.`,
+                        type: "INFO",
+                        action_url: "/admin/patient-reviews",
+                    }),
+                ),
+            );
+        } catch (error) {
+            logger.error({ err: error }, "Failed to notify admins of new pending review");
+        }
     }
 
     public async getReviews(filters: ReviewFilters) {

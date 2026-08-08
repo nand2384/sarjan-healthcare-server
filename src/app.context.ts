@@ -82,7 +82,7 @@ const reviewCriterionRepository = new ReviewCriterionRepository(prisma);
 const reviewCriterionService = new ReviewCriterionService(reviewCriterionRepository);
 
 const reviewRepository = new ReviewRepository(prisma);
-const reviewService = new ReviewService(reviewRepository, reviewCriterionService, systemSettingService);
+const reviewService = new ReviewService(reviewRepository, reviewCriterionService, systemSettingService, staffRepository, notificationService);
 
 const staffService = new StaffService(prisma, staffRepository, staffRoleRepository, masterRepository, auditService, mailerService, authService, notificationService);
 

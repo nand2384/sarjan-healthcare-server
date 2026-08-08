@@ -34,6 +34,7 @@ export class ReviewRepository {
             where: { review_token: token },
             include: {
                 doctor: { select: { first_name: true, last_name: true } },
+                patient: { select: { first_name: true, last_name: true } },
                 review: { select: { review_id: true } },
             },
         });
