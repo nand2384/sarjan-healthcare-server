@@ -50,7 +50,7 @@ export class PatientRepository {
                 appointment_date: true,
                 patient: { select: { first_name: true, last_name: true, whatsapp_number: true } },
                 doctor: { select: { first_name: true, last_name: true } },
-                doctor_availability: { select: { start_time: true } },
+                doctor_availability: { select: { start_time: true, end_time: true } },
             },
         });
     }
@@ -173,7 +173,7 @@ export class PatientRepository {
                 none: {
                     appointment_date: { gte: today, lt: tomorrow },
                     // Only exclude if the appointment is still active (not a terminal status)
-                    appointment_status_id: { notIn: [6, 7, 15] } // COMPLETED, CANCELLED, WALKED_OUT
+                    appointment_status_id: { notIn: [6, 7, 15, 16] } // COMPLETED, CANCELLED, WALKED_OUT, NO_SHOW
                 }
             };
         }

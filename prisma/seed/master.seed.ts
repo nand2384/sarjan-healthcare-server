@@ -73,6 +73,7 @@ export async function seedMaster() {
                 { value_id: 6, master_id: appointmentStatusMaster.master_id, value_name: "COMPLETED", display_order: 6 },
                 { value_id: 7, master_id: appointmentStatusMaster.master_id, value_name: "CANCELLED", display_order: 7 },
                 { value_id: 15, master_id: appointmentStatusMaster.master_id, value_name: "WALKED_OUT", display_order: 8 },
+                { value_id: 16, master_id: appointmentStatusMaster.master_id, value_name: "NO_SHOW", display_order: 9 },
 
                 // Visit Reason (Matching frontend dropdown options)
                 { value_id: 8, master_id: visitReasonMaster.master_id, value_name: "General Checkup", display_order: 1 },

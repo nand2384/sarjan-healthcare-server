@@ -4,6 +4,7 @@ export const SystemSettingKey = {
     FAILED_LOGIN_MAX_ATTEMPTS: "FAILED_LOGIN_MAX_ATTEMPTS",
     FAILED_LOGIN_WINDOW_MINUTES: "FAILED_LOGIN_WINDOW_MINUTES",
     LOCKOUT_DURATION_MINUTES: "LOCKOUT_DURATION_MINUTES",
+    CHECK_IN_WINDOW_HOURS_BEFORE: "CHECK_IN_WINDOW_HOURS_BEFORE",
 } as const;
 
 export type SystemSettingKeyValue = (typeof SystemSettingKey)[keyof typeof SystemSettingKey];
@@ -14,6 +15,7 @@ export const SystemSettingDefaults: Record<SystemSettingKeyValue, number> = {
     [SystemSettingKey.FAILED_LOGIN_MAX_ATTEMPTS]: 10,
     [SystemSettingKey.FAILED_LOGIN_WINDOW_MINUTES]: 15,
     [SystemSettingKey.LOCKOUT_DURATION_MINUTES]: 30,
+    [SystemSettingKey.CHECK_IN_WINDOW_HOURS_BEFORE]: 1,
 };
 
 // Separate boolean-valued key set — SystemSettingDefaults above is numeric-only

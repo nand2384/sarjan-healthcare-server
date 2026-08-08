@@ -5,8 +5,9 @@ import { appContext } from "./app.context";
 import { env } from "./config/env";
 import { connectDatabase } from "./database";
 import { redisClient } from "@cache";
-import { startSessionCleanupJob, startNotificationCleanupJob, startAppointmentReminderSweepJob, startDoctorShiftNoticeJob, startMonitoringLogCleanupJob } from "@scheduler";
+import { startSessionCleanupJob, startNotificationCleanupJob, startAppointmentReminderSweepJob, startDoctorShiftNoticeJob, startMonitoringLogCleanupJob, startAppointmentNoShowSweepJob } from "@scheduler";
 import { startReminderWorker } from "./queues/reminder.worker";
+import { startNoShowWorker } from "./queues/no-show.worker";
 import { shutdown } from "./shutdown";
 import { setupWebSockets } from "./websocket";
 import { setHttpServer, setSocketServer, setWebSocketService } from "./server.instance";
@@ -21,9 +22,11 @@ async function startServer(): Promise<void> {
     startSessionCleanupJob();
     startNotificationCleanupJob();
     startAppointmentReminderSweepJob();
+    startAppointmentNoShowSweepJob();
     startDoctorShiftNoticeJob();
     startMonitoringLogCleanupJob();
     startReminderWorker();
+    startNoShowWorker();
 
     const httpServer = createServer(app);
 

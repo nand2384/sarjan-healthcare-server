@@ -7,8 +7,9 @@ import { QueueType } from "@generated/prisma/client";
 import { AppError, ErrorCode } from "@errors";
 import { SystemSettingService } from "@modules/system-setting/system-setting.service";
 import { SystemSettingKey } from "constants/system-setting.constants";
-import { getAppointmentStartInstantUTC, formatSlotTime12Hour } from "utils/appointment-time.util";
+import { getAppointmentStartInstantUTC, getAppointmentEndInstantUTC, formatSlotTime12Hour } from "utils/appointment-time.util";
 import { scheduleReminder } from "queues/reminder.queue";
+import { scheduleNoShowCheck } from "queues/no-show.queue";
 import { CLINIC_NAME } from "whatsapp";
 import { logger } from "@logger";
 
@@ -76,6 +77,39 @@ export class PatientService {
             );
         } catch (error) {
             logger.error({ err: error, appointmentId }, "Failed to schedule appointment reminder at booking time");
+        }
+    }
+
+    /**
+     * Sibling of maybeScheduleReminderForNewBooking, same today/tomorrow-only
+     * coverage window and same reasoning — anything further out is left to
+     * the nightly appointment-no-show-sweep job. Never throws — a scheduling
+     * hiccup must not fail the booking itself.
+     */
+    private async maybeScheduleNoShowForNewBooking(appointmentId: number, appointmentDate: Date): Promise<void> {
+        try {
+            const todayMidnightUTC = new Date();
+            todayMidnightUTC.setUTCHours(0, 0, 0, 0);
+            const dayAfterTomorrowMidnightUTC = new Date(todayMidnightUTC);
+            dayAfterTomorrowMidnightUTC.setUTCDate(dayAfterTomorrowMidnightUTC.getUTCDate() + 2);
+
+            if (appointmentDate < todayMidnightUTC || appointmentDate >= dayAfterTomorrowMidnightUTC) {
+                return;
+            }
+
+            const context = await this.patientRepository.getAppointmentReminderContext(appointmentId);
+            if (!context?.doctor_availability?.end_time) {
+                return;
+            }
+
+            const endInstant = getAppointmentEndInstantUTC(context.appointment_date, context.doctor_availability.end_time);
+            const delayMs = endInstant.getTime() - Date.now();
+
+            if (delayMs <= 0) return;
+
+            await scheduleNoShowCheck({ appointmentId }, delayMs);
+        } catch (error) {
+            logger.error({ err: error, appointmentId }, "Failed to schedule no-show check at booking time");
         }
     }
 
@@ -175,6 +209,7 @@ export class PatientService {
 
         if (mode !== 'walk-in') {
             void this.maybeScheduleReminderForNewBooking(appointment.appointment_id, appointment.appointment_date);
+            void this.maybeScheduleNoShowForNewBooking(appointment.appointment_id, appointment.appointment_date);
         }
 
         return PatientMapper.toRegisterAndBookResponse(patient, appointment, queue);
@@ -277,6 +312,7 @@ export class PatientService {
 
         if (mode !== 'walk-in') {
             void this.maybeScheduleReminderForNewBooking(appointment.appointment_id, appointment.appointment_date);
+            void this.maybeScheduleNoShowForNewBooking(appointment.appointment_id, appointment.appointment_date);
         }
 
         return PatientMapper.toRegisterAndBookResponse(patient, appointment, queue);

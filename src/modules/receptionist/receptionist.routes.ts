@@ -3,7 +3,7 @@ import { ReceptionistController } from "./receptionist.controller";
 import { authMiddleware, roleMiddleware, validate } from "@middleware";
 import { appContext } from "../../app.context";
 import { USER_ROLE } from "../../common/common.schema";
-import { updateAppointmentStatusSchema, sendForTestsSchema } from "./receptionist.schema";
+import { updateAppointmentStatusSchema, sendForTestsSchema, rescheduleAppointmentSchema } from "./receptionist.schema";
 import { checkoutSchema } from "@modules/billing/billing.schema";
 
 export const receptionistRouter = Router();
@@ -45,6 +45,14 @@ receptionistRouter.patch(
     roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
     validate(updateAppointmentStatusSchema),
     receptionistController.updateAppointmentStatus.bind(receptionistController)
+);
+
+receptionistRouter.patch(
+    "/appointments/:id/reschedule",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    validate(rescheduleAppointmentSchema),
+    receptionistController.rescheduleAppointment.bind(receptionistController)
 );
 
 receptionistRouter.post(

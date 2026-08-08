@@ -88,6 +88,27 @@ export class ReceptionistController {
         });
     }
 
+    public async rescheduleAppointment(req: Request, res: Response) {
+        const appointmentId = parseInt(req.params.id as string);
+        if (isNaN(appointmentId)) {
+            throw new AppError(400, ErrorCode.BAD_REQUEST, "Invalid appointment ID");
+        }
+
+        const staffId = req.session?.staff_id;
+        if (!staffId) {
+            throw new AppError(401, ErrorCode.UNAUTHORIZED, "User not authenticated");
+        }
+
+        const { doctor_availability_id, appointment_date } = req.body;
+
+        const data = await this.receptionistService.rescheduleAppointment(appointmentId, doctor_availability_id, appointment_date, staffId);
+        return res.status(200).json({
+            success: true,
+            message: "Appointment rescheduled successfully",
+            data
+        });
+    }
+
     public async sendForTests(req: Request, res: Response) {
         const appointmentId = parseInt(req.params.id as string);
         if (isNaN(appointmentId)) {
@@ -165,7 +186,7 @@ export class ReceptionistController {
             endDate,
             doctorId: doctor_id ? Number(doctor_id) : undefined,
             queueType: queue_type as 'BOOKED' | 'WALK_IN' | undefined,
-            status: status as 'completed' | 'walked-out' | 'cancelled' | undefined,
+            status: status as 'completed' | 'walked-out' | 'cancelled' | 'no-show' | undefined,
             search: search as string | undefined,
             page: page ? Number(page) : 1,
             limit: limit ? Number(limit) : 20,

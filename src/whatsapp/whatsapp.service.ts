@@ -1,6 +1,6 @@
 import { logger } from "@logger";
 import { whatsappConfig, isWhatsAppConfigured } from "./whatsapp.config";
-import { SendAppointmentReminderOptions, SendOtpMessageOptions, WhatsAppTemplateName } from "./whatsapp.types";
+import { SendAppointmentReminderOptions, SendOtpMessageOptions, SendAppointmentRescheduledOptions, WhatsAppTemplateName } from "./whatsapp.types";
 import { EventLogService } from "@modules/event-log/event-log.service";
 
 interface TemplateComponentParam {
@@ -90,6 +90,16 @@ export class WhatsAppService {
             { type: "text", text: options.patientName },
             { type: "text", text: options.doctorName },
             { type: "text", text: options.slotTimeFormatted },
+            { type: "text", text: options.clinicName },
+        ]);
+    }
+
+    async sendAppointmentRescheduled(options: SendAppointmentRescheduledOptions): Promise<void> {
+        await this.send(options.whatsappNumber, WhatsAppTemplateName.APPOINTMENT_RESCHEDULED, [
+            { type: "text", text: options.patientName },
+            { type: "text", text: options.doctorName },
+            { type: "text", text: options.newDateFormatted },
+            { type: "text", text: options.newSlotTimeFormatted },
             { type: "text", text: options.clinicName },
         ]);
     }

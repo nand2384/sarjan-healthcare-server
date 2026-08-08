@@ -12,6 +12,10 @@ export interface AppointmentDto {
     ui_time_slot: string;
     ui_dashboard_slot?: string;
     ui_is_arrived: boolean;
+    ui_can_check_in: boolean;
+    check_in_opens_at?: string;
+    check_in_closes_at?: string;
+    reschedule_count: number;
     ui_doctor_name: string | null;
     patient: {
         patient_id: number;
@@ -83,7 +87,7 @@ export interface DoctorDashboardResponseDto {
 export interface AppointmentHistoryItemDto {
     appointment_id: number;
     date: string;
-    status: 'completed' | 'walked-out' | 'cancelled';
+    status: 'completed' | 'walked-out' | 'cancelled' | 'no-show';
     patient_name: string;
     mobile_number: string;
     doctor_name: string;

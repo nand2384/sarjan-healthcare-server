@@ -92,7 +92,7 @@ const billingRepository = new BillingRepository(prisma);
 const billingService = new BillingService(billingRepository, auditService, mailerService);
 
 const receptionistRepository = new ReceptionistRepository(prisma);
-const receptionistService = new ReceptionistService(receptionistRepository, billingRepository, billingService, systemSettingService);
+const receptionistService = new ReceptionistService(receptionistRepository, billingRepository, billingService, systemSettingService, whatsAppService);
 
 const financeRepository = new FinanceRepository(prisma);
 const financeService = new FinanceService(financeRepository);

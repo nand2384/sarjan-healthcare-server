@@ -1,10 +1,16 @@
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// This project runs as native ESM ("type": "module") — __dirname isn't
+// defined here (confirmed: tsx does not polyfill it), so it has to be
+// derived from import.meta.url instead.
+const currentDir = dirname(fileURLToPath(import.meta.url));
 
 function readPackageVersion(): string {
     try {
-        const pkgPath = join(__dirname, "..", "..", "package.json");
+        const pkgPath = join(currentDir, "..", "..", "package.json");
         const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: string };
         return pkg.version ?? "unknown";
     } catch {

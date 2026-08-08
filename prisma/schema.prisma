@@ -522,6 +522,10 @@ model Appointment {
 
   appointment_remarks String?
 
+  // Capped at 1 — enforced in ReceptionistService.rescheduleAppointment, not
+  // just a display counter.
+  reschedule_count Int @default(0)
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 

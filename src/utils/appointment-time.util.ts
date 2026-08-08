@@ -27,6 +27,32 @@ export function getAppointmentStartInstantUTC(appointmentDate: Date, slotStartTi
 }
 
 /**
+ * Same combination as `getAppointmentStartInstantUTC`, but for `end_time` —
+ * the true UTC instant a slot closes. Used for check-in window gating and
+ * the no-show sweep.
+ */
+export function getAppointmentEndInstantUTC(appointmentDate: Date, slotEndTime: Date): Date {
+    const year = appointmentDate.getUTCFullYear();
+    const month = appointmentDate.getUTCMonth();
+    const day = appointmentDate.getUTCDate();
+    const hours = slotEndTime.getUTCHours();
+    const minutes = slotEndTime.getUTCMinutes();
+
+    return new Date(Date.UTC(year, month, day, hours, minutes) - IST_OFFSET_MS);
+}
+
+/**
+ * Today's IST calendar day, encoded the same UTC-midnight-anchored way
+ * `Appointment.appointment_date` is (a `@db.Date` column) — so the two can be
+ * compared directly with `<`/`>=`/`===` without a timezone bug. Used for the
+ * reschedule "not on the day of" cutoff.
+ */
+export function getTodayAsAppointmentDateUTC(): Date {
+    const istNow = new Date(Date.now() + IST_OFFSET_MS);
+    return new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()));
+}
+
+/**
  * Formats a `DoctorAvailability.start_time`/`end_time`-style value ("time of
  * day" encoded via getUTC* accessors, see above) as a 12-hour clock string —
  * e.g. "9:00 AM". Used for WhatsApp reminder / shift-notice message content.

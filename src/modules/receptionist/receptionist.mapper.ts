@@ -1,5 +1,6 @@
 import { AppointmentDto, DoctorDto, DashboardResponseDto, DoctorDashboardResponseDto, AppointmentHistoryItemDto } from "./receptionist.dtos";
 import { isPromotedWalkIn, sortAppointmentsByQueuePriority } from "./receptionist.queue.util";
+import { getAppointmentStartInstantUTC, getAppointmentEndInstantUTC } from "utils/appointment-time.util";
 
 export class ReceptionistMapper {
     private static formatTime12Hour(timeData: string | Date | null): string {
@@ -33,14 +34,30 @@ export class ReceptionistMapper {
         return `${formattedHours}:${minutes} ${ampm}`;
     }
 
-    public static toAppointmentDto(appt: any, walkInPriorityThreshold?: number): AppointmentDto {
+    public static toAppointmentDto(appt: any, walkInPriorityThreshold?: number, checkInWindowHours?: number): AppointmentDto {
         const rawStatus = appt.appointment_status?.value_name || 'BOOKED';
         const statusName = rawStatus.toUpperCase().replace(/ /g, '_');
         const isArrived = statusName !== 'BOOKED';
-        
+
         let uiTimeSlot = 'Walk-in';
         if (appt.doctor_availability?.start_time && appt.doctor_availability?.end_time) {
             uiTimeSlot = `${this.formatTime12Hour(appt.doctor_availability.start_time)} - ${this.formatTime12Hour(appt.doctor_availability.end_time)}`;
+        }
+
+        // Check-in window is only meaningful for scheduled (non-walk-in) BOOKED
+        // appointments — walk-ins are created already CHECKED_IN, so they never
+        // reach this branch with statusName === 'BOOKED'.
+        let checkInOpensAt: Date | undefined;
+        let checkInClosesAt: Date | undefined;
+        let canCheckIn = false;
+        if (statusName === 'BOOKED' && appt.doctor_availability?.start_time && appt.doctor_availability?.end_time && appt.appointment_date) {
+            const startInstant = getAppointmentStartInstantUTC(appt.appointment_date, appt.doctor_availability.start_time);
+            const endInstant = getAppointmentEndInstantUTC(appt.appointment_date, appt.doctor_availability.end_time);
+            const hoursBefore = checkInWindowHours ?? 1;
+            checkInOpensAt = new Date(startInstant.getTime() - hoursBefore * 60 * 60 * 1000);
+            checkInClosesAt = endInstant;
+            const now = Date.now();
+            canCheckIn = now >= checkInOpensAt.getTime() && now <= checkInClosesAt.getTime();
         }
 
         const apptDate = appt.appointment_date ? new Date(appt.appointment_date) : null;
@@ -65,6 +82,10 @@ export class ReceptionistMapper {
             ui_time_slot: uiTimeSlot,
             ui_dashboard_slot: uiDashboardSlot,
             ui_is_arrived: isArrived,
+            ui_can_check_in: canCheckIn,
+            check_in_opens_at: checkInOpensAt?.toISOString(),
+            check_in_closes_at: checkInClosesAt?.toISOString(),
+            reschedule_count: appt.reschedule_count ?? 0,
             ui_doctor_name: appt.doctor ? `Dr. ${appt.doctor.first_name} ${appt.doctor.last_name}` : null,
             patient: {
                 patient_id: appt.patient.patient_id,
@@ -91,7 +112,7 @@ export class ReceptionistMapper {
         };
     }
 
-    public static toDoctorDto(doc: any, walkInPriorityThreshold?: number): DoctorDto {
+    public static toDoctorDto(doc: any, walkInPriorityThreshold?: number, checkInWindowHours?: number): DoctorDto {
         const orderedAppointments = doc.doctor_appointments
             ? sortAppointmentsByQueuePriority(doc.doctor_appointments, walkInPriorityThreshold)
             : undefined;
@@ -105,15 +126,15 @@ export class ReceptionistMapper {
             waiting: orderedAppointments?.filter((a: any) => [5, 13, 14].includes(a.appointment_status_id)).length || 0, // CHECKED_IN, WAITING_REPORTS, AWAITING_PAYMENT
             completed: orderedAppointments?.filter((a: any) => a.appointment_status_id === 6).length || 0, // COMPLETED
             doctor_appointments: orderedAppointments
-                ? orderedAppointments.map((appt: any) => this.toAppointmentDto({ ...appt, doctor: doc, patient: appt.patient }, walkInPriorityThreshold))
+                ? orderedAppointments.map((appt: any) => this.toAppointmentDto({ ...appt, doctor: doc, patient: appt.patient }, walkInPriorityThreshold, checkInWindowHours))
                 : undefined,
         };
     }
 
-    public static toDashboardResponse(doctors: any[], appointments: any[], stats?: any, walkInPriorityThreshold?: number): DashboardResponseDto {
+    public static toDashboardResponse(doctors: any[], appointments: any[], stats?: any, walkInPriorityThreshold?: number, checkInWindowHours?: number): DashboardResponseDto {
         return {
-            doctors: doctors.map(doc => this.toDoctorDto(doc, walkInPriorityThreshold)),
-            upcomingAppointments: appointments.map(appt => this.toAppointmentDto(appt, walkInPriorityThreshold)),
+            doctors: doctors.map(doc => this.toDoctorDto(doc, walkInPriorityThreshold, checkInWindowHours)),
+            upcomingAppointments: appointments.map(appt => this.toAppointmentDto(appt, walkInPriorityThreshold, checkInWindowHours)),
             stats
         };
     }
@@ -148,14 +169,14 @@ export class ReceptionistMapper {
         };
     }
 
-    public static toDoctorDashboardResponse(doctor: any, appointments: any[], walkInPriorityThreshold?: number): DoctorDashboardResponseDto {
+    public static toDoctorDashboardResponse(doctor: any, appointments: any[], walkInPriorityThreshold?: number, checkInWindowHours?: number): DoctorDashboardResponseDto {
         const orderedAppointments = doctor?.doctor_appointments
             ? sortAppointmentsByQueuePriority(doctor.doctor_appointments, walkInPriorityThreshold)
             : [];
 
-        const advanceQueue = orderedAppointments.map((appt: any) => this.toAppointmentDto({ ...appt, doctor, patient: appt.patient }, walkInPriorityThreshold));
+        const advanceQueue = orderedAppointments.map((appt: any) => this.toAppointmentDto({ ...appt, doctor, patient: appt.patient }, walkInPriorityThreshold, checkInWindowHours));
 
-        const localAppointmentsData = appointments.map(appt => this.toAppointmentDto(appt, walkInPriorityThreshold));
+        const localAppointmentsData = appointments.map(appt => this.toAppointmentDto(appt, walkInPriorityThreshold, checkInWindowHours));
 
         const activeAppointments = advanceQueue.map((appt: AppointmentDto) => this.toPatientQueueDtoFromAppt(appt));
         
@@ -174,7 +195,7 @@ export class ReceptionistMapper {
             .map((appt: AppointmentDto) => this.toPatientQueueDtoFromAppt(appt));
             
         return {
-            doctor: this.toDoctorDto(doctor, walkInPriorityThreshold),
+            doctor: this.toDoctorDto(doctor, walkInPriorityThreshold, checkInWindowHours),
             currentlyConsulting,
             advanceBookingQueue,
             walkInBookingQueue,
@@ -182,10 +203,11 @@ export class ReceptionistMapper {
         };
     }
 
-    private static readonly HISTORY_STATUS_MAP: Record<number, 'completed' | 'walked-out' | 'cancelled'> = {
+    private static readonly HISTORY_STATUS_MAP: Record<number, 'completed' | 'walked-out' | 'cancelled' | 'no-show'> = {
         6: 'completed',
         15: 'walked-out',
         7: 'cancelled',
+        16: 'no-show',
     };
 
     public static toAppointmentHistoryItemDto(appt: any): AppointmentHistoryItemDto {
