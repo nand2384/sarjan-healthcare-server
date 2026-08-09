@@ -10,8 +10,24 @@ import { AuditService } from "@modules/audit/audit.service";
 import { MailerService } from "mailer";
 import { env } from "@config";
 import crypto from "node:crypto";
-import { AuditAction, AuditEntityType } from "@generated/prisma/client";
+import { AuditAction, AuditEntityType, DayOfWeek } from "@generated/prisma/client";
 import { logger } from "@logger";
+import { StorageService } from "@modules/storage/storage.service";
+import { formatSlotTime12Hour } from "utils/appointment-time.util";
+
+const PHOTO_TYPES = ["card", "pose"] as const;
+export type DoctorPhotoType = (typeof PHOTO_TYPES)[number];
+
+// JS Date#getDay() is 0=Sunday..6=Saturday — maps directly onto the DayOfWeek enum.
+const JS_DAY_INDEX_TO_ENUM: DayOfWeek[] = [
+    DayOfWeek.SUNDAY,
+    DayOfWeek.MONDAY,
+    DayOfWeek.TUESDAY,
+    DayOfWeek.WEDNESDAY,
+    DayOfWeek.THURSDAY,
+    DayOfWeek.FRIDAY,
+    DayOfWeek.SATURDAY,
+];
 
 export class DoctorService {
     constructor(
@@ -21,6 +37,7 @@ export class DoctorService {
         private readonly staffRoleRepository: StaffRoleRepository,
         private readonly auditService: AuditService,
         private readonly mailerService: MailerService,
+        private readonly storageService: StorageService,
     ) {}
 
     public async getAllDoctors() {
@@ -45,6 +62,13 @@ export class DoctorService {
         const mappedDoctor = {
             ...doctor,
             roles: doctor.staff_roles.map((sr) => sr.role),
+            // Derived, admin-facing URLs for the photo management UI — the
+            // raw storage keys stay server-side, only used to build the URL.
+            doctor_profile: doctor.doctor_profile && {
+                ...doctor.doctor_profile,
+                card_photo_url: doctor.doctor_profile.card_photo_key ? this.storageService.getPublicUrl(doctor.doctor_profile.card_photo_key) : null,
+                pose_photo_url: doctor.doctor_profile.pose_photo_key ? this.storageService.getPublicUrl(doctor.doctor_profile.pose_photo_key) : null,
+            },
         };
         delete (mappedDoctor as any).staff_roles;
 
@@ -237,6 +261,214 @@ export class DoctorService {
         });
 
         return this.getDoctorById(staffId);
+    }
+
+    /** Uploads (and replaces) a doctor's card or pose photo — decoupled from doctor creation, its own admin surface. */
+    public async uploadDoctorPhoto(staffId: number, type: DoctorPhotoType, file: { buffer: Buffer; mimetype: string; originalname: string }) {
+        const existing = await this.prisma.doctorProfile.findUnique({ where: { staff_id: staffId } });
+        if (!existing) {
+            throw new AppError(404, ErrorCode.NOT_FOUND, "Doctor not found.");
+        }
+
+        const extension = file.originalname.split(".").pop() || "jpg";
+        const key = `doctors/${staffId}/${type}-${Date.now()}.${extension}`;
+        await this.storageService.upload(file.buffer, key, file.mimetype);
+
+        const previousKey = type === "card" ? existing.card_photo_key : existing.pose_photo_key;
+        const field = type === "card" ? "card_photo_key" : "pose_photo_key";
+        await this.doctorRepository.updateDoctorProfile(staffId, { [field]: key });
+
+        // Best-effort cleanup of the old object — a failure here shouldn't
+        // fail the upload the admin is actively waiting on.
+        if (previousKey) {
+            this.storageService.delete(previousKey).catch((error) => logger.warn({ err: error }, "Failed to delete replaced doctor photo"));
+        }
+
+        return { key, url: this.storageService.getPublicUrl(key) };
+    }
+
+    public async deleteDoctorPhoto(staffId: number, type: DoctorPhotoType) {
+        const existing = await this.prisma.doctorProfile.findUnique({ where: { staff_id: staffId } });
+        if (!existing) {
+            throw new AppError(404, ErrorCode.NOT_FOUND, "Doctor not found.");
+        }
+
+        const key = type === "card" ? existing.card_photo_key : existing.pose_photo_key;
+        const field = type === "card" ? "card_photo_key" : "pose_photo_key";
+
+        if (key) {
+            await this.storageService.delete(key);
+        }
+        await this.doctorRepository.updateDoctorProfile(staffId, { [field]: null });
+    }
+
+    /** Public-facing list for the landing page's Doctors grid. */
+    public async getPublicList() {
+        const doctors = await this.doctorRepository.findPublicList();
+        return doctors.map((doctor) => ({
+            id: doctor.staff_id,
+            name: `Dr. ${doctor.first_name} ${doctor.last_name}`,
+            specialty: doctor.doctor_profile?.specialization ?? "",
+            education: doctor.doctor_profile?.qualification ?? "",
+            experience: doctor.doctor_profile?.experience ?? "",
+            cardImageUrl: doctor.doctor_profile?.card_photo_key ? this.storageService.getPublicUrl(doctor.doctor_profile.card_photo_key) : null,
+        }));
+    }
+
+    /** Public-facing full detail for the doctor detail page. */
+    public async getPublicDetail(staffId: number) {
+        const doctor = await this.doctorRepository.findPublicDetail(staffId);
+        if (!doctor) {
+            throw new AppError(404, ErrorCode.NOT_FOUND, "Doctor not found.");
+        }
+        return {
+            id: doctor.staff_id,
+            name: `Dr. ${doctor.first_name} ${doctor.last_name}`,
+            specialty: doctor.doctor_profile?.specialization ?? "",
+            education: doctor.doctor_profile?.qualification ?? "",
+            experience: doctor.doctor_profile?.experience ?? "",
+            biography: doctor.doctor_profile?.biography ?? null,
+            cardImageUrl: doctor.doctor_profile?.card_photo_key ? this.storageService.getPublicUrl(doctor.doctor_profile.card_photo_key) : null,
+            poseImageUrl: doctor.doctor_profile?.pose_photo_key ? this.storageService.getPublicUrl(doctor.doctor_profile.pose_photo_key) : null,
+        };
+    }
+
+    /** Doctors with a pose photo uploaded — feeds the hero carousel. */
+    public async getPublicHeroDoctors() {
+        const doctors = await this.doctorRepository.findPublicList();
+        return doctors
+            .filter((doctor) => !!doctor.doctor_profile?.pose_photo_key)
+            .map((doctor) => ({
+                id: doctor.staff_id,
+                name: `Dr. ${doctor.first_name} ${doctor.last_name}`,
+                role: doctor.doctor_profile?.qualification ?? "",
+                image: this.storageService.getPublicUrl(doctor.doctor_profile!.pose_photo_key!),
+            }));
+    }
+
+    /**
+     * Public full-week availability for one doctor — the doctor detail page's
+     * timeline. Never touches Appointment; only WHEN the doctor is in, never
+     * how many slots are booked/remaining. A day fully covered by a full-day
+     * leave (doctor_availability_id null) is dropped entirely; a slot covered
+     * by a partial-day leave (doctor_availability_id set) is dropped
+     * individually — same leave-overlap logic as the internal
+     * getEffectiveSchedule(), deliberately reimplemented here rather than
+     * reused so this public surface can never accidentally start returning
+     * booking counts.
+     */
+    public async getPublicWeekAvailability(staffId: number) {
+        const doctor = await this.doctorRepository.findPublicDetail(staffId);
+        if (!doctor) {
+            throw new AppError(404, ErrorCode.NOT_FOUND, "Doctor not found.");
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(today);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+
+        const toDateStr = (d: Date) => {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const dd = String(d.getDate()).padStart(2, "0");
+            return `${yyyy}-${mm}-${dd}`;
+        };
+
+        const [weeklySchedule, leaves] = await Promise.all([
+            this.doctorRepository.getDoctorAvailability(staffId),
+            this.doctorRepository.getDoctorLeavesInRange(staffId, toDateStr(today), toDateStr(weekEnd)),
+        ]);
+
+        const days = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(today);
+            d.setDate(d.getDate() + i);
+
+            const dayOfWeek = JS_DAY_INDEX_TO_ENUM[d.getDay()];
+
+            const fullDayLeave = leaves.some((l) => {
+                const ls = new Date(l.start_date);
+                const le = new Date(l.end_date);
+                ls.setHours(0, 0, 0, 0);
+                le.setHours(0, 0, 0, 0);
+                return !l.doctor_availability_id && ls <= d && le >= d;
+            });
+
+            let slots: { slotName: string; startTime: string; endTime: string }[] = [];
+            if (!fullDayLeave) {
+                const partialLeaveIds = new Set(
+                    leaves
+                        .filter((l) => {
+                            const ls = new Date(l.start_date);
+                            const le = new Date(l.end_date);
+                            ls.setHours(0, 0, 0, 0);
+                            le.setHours(0, 0, 0, 0);
+                            return l.doctor_availability_id && ls <= d && le >= d;
+                        })
+                        .map((l) => l.doctor_availability_id),
+                );
+
+                slots = weeklySchedule
+                    .filter((s) => s.day_of_week === dayOfWeek && !partialLeaveIds.has(s.doctor_availability_id))
+                    .map((s) => ({
+                        slotName: s.slot_name,
+                        startTime: formatSlotTime12Hour(s.start_time),
+                        endTime: formatSlotTime12Hour(s.end_time),
+                    }));
+            }
+
+            days.push({ date: toDateStr(d), dayOfWeek, slots });
+        }
+
+        return days;
+    }
+
+    /**
+     * Public "everyone today" availability, for the landing page timeline —
+     * every visible/accepting doctor's slots for today's day-of-week, with
+     * doctors on full/partial leave today filtered out the same way as
+     * getPublicWeekAvailability(). No booking counts, no Appointment table.
+     */
+    public async getPublicTodayAvailability() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dayOfWeek = JS_DAY_INDEX_TO_ENUM[today.getDay()];
+
+        const [slots, leaves] = await Promise.all([
+            this.doctorRepository.findPublicAvailabilityForDay(dayOfWeek),
+            this.doctorRepository.findLeavesForDate(today),
+        ]);
+
+        const fullDayLeaveStaffIds = new Set(
+            leaves.filter((l) => !l.doctor_availability_id).map((l) => l.doctor_staff_id),
+        );
+        const partialLeaveAvailabilityIds = new Set(
+            leaves.filter((l) => l.doctor_availability_id).map((l) => l.doctor_availability_id),
+        );
+
+        const byDoctor = new Map<number, { doctorId: number; name: string; slots: { slotName: string; startTime: string; endTime: string }[] }>();
+
+        for (const slot of slots) {
+            if (fullDayLeaveStaffIds.has(slot.doctor_staff_id)) continue;
+            if (partialLeaveAvailabilityIds.has(slot.doctor_availability_id)) continue;
+
+            if (!byDoctor.has(slot.doctor_staff_id)) {
+                byDoctor.set(slot.doctor_staff_id, {
+                    doctorId: slot.doctor_staff_id,
+                    name: `Dr. ${slot.doctor.first_name} ${slot.doctor.last_name}`,
+                    slots: [],
+                });
+            }
+
+            byDoctor.get(slot.doctor_staff_id)!.slots.push({
+                slotName: slot.slot_name,
+                startTime: formatSlotTime12Hour(slot.start_time),
+                endTime: formatSlotTime12Hour(slot.end_time),
+            });
+        }
+
+        return Array.from(byDoctor.values());
     }
 
     public async getBasicDoctors() {

@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient, DoctorProfile } from "@generated/prisma/client";
+import { Prisma, PrismaClient, DoctorProfile, DayOfWeek } from "@generated/prisma/client";
 import { DoctorListEntity, DoctorDetailEntity } from "./doctor.types";
 
 export class DoctorRepository {
@@ -108,6 +108,8 @@ export class DoctorRepository {
                         experience: true,
                         is_visible_on_website: true,
                         is_accepting_appointments: true,
+                        card_photo_key: true,
+                        pose_photo_key: true,
                     }
                 },
                 is_disabled: true,
@@ -143,6 +145,68 @@ export class DoctorRepository {
                 staff_id: staffId,
             },
             data,
+        });
+    }
+
+    /**
+     * Public-facing doctor list — deliberately its own minimal query, not a
+     * reuse of getAllDoctors() (which selects email/mobile/activation state
+     * etc. for the internal admin UI). Only visible-on-website doctors, only
+     * marketing-safe fields.
+     */
+    public async findPublicList() {
+        return this.prisma.staff.findMany({
+            where: {
+                deleted_at: null,
+                is_system_account: false,
+                is_disabled: false,
+                staff_roles: { some: { role_id: 2 } },
+                doctor_profile: { is_visible_on_website: true },
+            },
+            orderBy: { doctor_profile: { display_order: "asc" } },
+            select: {
+                staff_id: true,
+                first_name: true,
+                last_name: true,
+                doctor_profile: {
+                    select: {
+                        specialization: true,
+                        qualification: true,
+                        experience: true,
+                        card_photo_key: true,
+                        pose_photo_key: true,
+                        display_order: true,
+                    },
+                },
+            },
+        });
+    }
+
+    public async findPublicDetail(staffId: number) {
+        return this.prisma.staff.findFirst({
+            where: {
+                staff_id: staffId,
+                deleted_at: null,
+                is_system_account: false,
+                is_disabled: false,
+                staff_roles: { some: { role_id: 2 } },
+                doctor_profile: { is_visible_on_website: true },
+            },
+            select: {
+                staff_id: true,
+                first_name: true,
+                last_name: true,
+                doctor_profile: {
+                    select: {
+                        specialization: true,
+                        qualification: true,
+                        biography: true,
+                        experience: true,
+                        card_photo_key: true,
+                        pose_photo_key: true,
+                    },
+                },
+            },
         });
     }
 
@@ -231,6 +295,52 @@ export class DoctorRepository {
             },
             orderBy: {
                 start_date: "asc",
+            },
+        });
+    }
+
+    /** Every visible/accepting doctor's recurring slots for one day-of-week — feeds the public "everyone today" timeline. */
+    public async findPublicAvailabilityForDay(dayOfWeek: DayOfWeek) {
+        return this.prisma.doctorAvailability.findMany({
+            where: {
+                day_of_week: dayOfWeek,
+                deleted_at: null,
+                doctor: {
+                    deleted_at: null,
+                    is_system_account: false,
+                    is_disabled: false,
+                    staff_roles: { some: { role_id: 2 } },
+                    doctor_profile: { is_visible_on_website: true, is_accepting_appointments: true },
+                },
+            },
+            orderBy: [{ display_order: "asc" }],
+            select: {
+                doctor_availability_id: true,
+                doctor_staff_id: true,
+                slot_name: true,
+                start_time: true,
+                end_time: true,
+                doctor: {
+                    select: {
+                        staff_id: true,
+                        first_name: true,
+                        last_name: true,
+                    },
+                },
+            },
+        });
+    }
+
+    /** All doctor leaves covering a single date — used to filter the "everyone today" timeline. */
+    public async findLeavesForDate(date: Date) {
+        return this.prisma.doctorLeave.findMany({
+            where: {
+                start_date: { lte: date },
+                end_date: { gte: date },
+            },
+            select: {
+                doctor_staff_id: true,
+                doctor_availability_id: true,
             },
         });
     }

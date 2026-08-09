@@ -5,6 +5,7 @@ import { AppError, ErrorCode } from "@errors";
 import { ZodError } from "zod";
 import { Prisma } from "@generated/prisma/client";
 import { appContext } from "app.context";
+import { MulterError } from "multer";
 
 function persistIfServerError(statusCode: number, error: Error, req: Request): void {
     if (statusCode < 500) return;
@@ -46,6 +47,26 @@ export function errorHandler(error: Error, req: Request, res: Response, _next: N
             },
         });
 
+        return;
+    }
+
+    if (error instanceof MulterError) {
+        res.status(400).json({
+            success: false,
+            error: {
+                code: ErrorCode.BAD_REQUEST,
+                message: error.code === "LIMIT_FILE_SIZE" ? "File is too large." : error.message,
+            },
+        });
+        return;
+    }
+
+    // fileFilter's rejection (a plain Error, not a MulterError) also lands here.
+    if (error.message?.includes("Only JPEG, PNG, or WEBP images are allowed.")) {
+        res.status(400).json({
+            success: false,
+            error: { code: ErrorCode.BAD_REQUEST, message: error.message },
+        });
         return;
     }
 

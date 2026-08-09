@@ -80,6 +80,8 @@ export type DoctorDetailEntity = Prisma.StaffGetPayload<{
                 experience: true;
                 is_visible_on_website: true;
                 is_accepting_appointments: true;
+                card_photo_key: true;
+                pose_photo_key: true;
             }
         };
         is_disabled: true;

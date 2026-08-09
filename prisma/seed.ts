@@ -3,6 +3,7 @@ import { logger } from "../src/logger";
 import { seedAuth } from "./seed/auth.seed";
 import { seedMaster } from "./seed/master.seed";
 import { seedReviewCriteria } from "./seed/review-criteria.seed";
+import { seedClinicProfile } from "./seed/clinic-profile.seed";
 
 async function seed() {
     try {
@@ -11,6 +12,7 @@ async function seed() {
         await seedMaster();
         await seedAuth();
         await seedReviewCriteria();
+        await seedClinicProfile();
 
         logger.info("Database seeded successfully.");
     } catch (error) {

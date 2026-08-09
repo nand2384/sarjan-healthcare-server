@@ -28,6 +28,17 @@ export const envSchema = z.object({
     META_WHATSAPP_TOKEN: z.string().optional(),
     META_WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
     META_WHATSAPP_API_VERSION: z.string().default("v20.0"),
+    // Optional: file storage (Supabase Storage's S3-compatible API today —
+    // same @aws-sdk/client-s3 client works unchanged against real AWS S3
+    // later, just by pointing these at a different endpoint/region/bucket).
+    // Upload endpoints degrade to a clear "not configured" error when unset,
+    // same pattern as the WhatsApp vars above.
+    STORAGE_ENDPOINT: z.string().optional(),
+    STORAGE_REGION: z.string().optional(),
+    STORAGE_ACCESS_KEY_ID: z.string().optional(),
+    STORAGE_SECRET_ACCESS_KEY: z.string().optional(),
+    STORAGE_BUCKET: z.string().optional(),
+    STORAGE_PUBLIC_URL_BASE: z.string().optional(),
     // Deployed-version panel — optionally set explicitly in the hosting
     // platform's env config at deploy time (e.g. Vercel auto-provides
     // VERCEL_GIT_COMMIT_SHA for client builds; map it to GIT_COMMIT_SHA here

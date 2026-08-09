@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
-import { DoctorService } from "./doctor.service";
+import { DoctorService, DoctorPhotoType } from "./doctor.service";
 import { CreateDoctorResponseDto } from "./doctor.dto";
 import { WebSocketPublisher } from "websocket";
+import { AppError, ErrorCode } from "@errors";
 
 export class DoctorController {
     constructor(private readonly doctorService: DoctorService) {}
@@ -53,6 +54,42 @@ export class DoctorController {
         return res.status(200).json({
             message: "Doctor updated successfully.",
             data: doctor,
+        });
+    };
+
+    public uploadDoctorPhoto = async (req: Request, res: Response) => {
+        const staffId = Number(req.params.id);
+        const type = req.params.type as DoctorPhotoType;
+        if (type !== "card" && type !== "pose") {
+            throw new AppError(400, ErrorCode.BAD_REQUEST, "Photo type must be 'card' or 'pose'.");
+        }
+        if (!req.file) {
+            throw new AppError(400, ErrorCode.BAD_REQUEST, "No file uploaded.");
+        }
+
+        const result = await this.doctorService.uploadDoctorPhoto(staffId, type, {
+            buffer: req.file.buffer,
+            mimetype: req.file.mimetype,
+            originalname: req.file.originalname,
+        });
+
+        return res.status(200).json({
+            message: "Photo uploaded successfully.",
+            data: result,
+        });
+    };
+
+    public deleteDoctorPhoto = async (req: Request, res: Response) => {
+        const staffId = Number(req.params.id);
+        const type = req.params.type as DoctorPhotoType;
+        if (type !== "card" && type !== "pose") {
+            throw new AppError(400, ErrorCode.BAD_REQUEST, "Photo type must be 'card' or 'pose'.");
+        }
+
+        await this.doctorService.deleteDoctorPhoto(staffId, type);
+
+        return res.status(200).json({
+            message: "Photo deleted successfully.",
         });
     };
 

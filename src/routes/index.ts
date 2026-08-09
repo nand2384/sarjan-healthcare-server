@@ -20,6 +20,10 @@ import { deliveryLogRouter } from "@modules/delivery-log/delivery-log.routes";
 import { releaseNoteRouter } from "@modules/release-note/release-note.routes";
 import { reviewCriterionRouter } from "@modules/review-criterion/review-criterion.routes";
 import { reviewRouter, publicReviewRouter } from "@modules/review/review.routes";
+import { clinicProfileRouter } from "@modules/clinic-profile/clinic-profile.routes";
+import { videoCategoryRouter } from "@modules/video-category/video-category.routes";
+import { videoRouter } from "@modules/video/video.routes";
+import { publicRouter } from "@modules/public/public.routes";
 
 // Remove on removing redis/clear API
 import { env } from "@config";
@@ -53,7 +57,11 @@ router.use("/delivery-logs", deliveryLogRouter);
 router.use("/release-notes", releaseNoteRouter);
 router.use("/review-criteria", reviewCriterionRouter);
 router.use("/reviews", reviewRouter);
+router.use("/clinic-profile", clinicProfileRouter);
+router.use("/video-categories", videoCategoryRouter);
+router.use("/videos", videoRouter);
 router.use("/public", publicReviewRouter);
+router.use("/public", publicRouter);
 
 router.get("/dev/redis/clear", async (_req, res, next) => {
     try {

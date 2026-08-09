@@ -3,14 +3,22 @@ import { appContext } from "../../app.context";
 import { DoctorController } from "./doctor.controller";
 import { validate } from "@middleware";
 import { createDoctorSchema, updateDoctorSchema, doctorAvailabilitySlotSchema, doctorLeaveSchema } from "./doctor.schema";
-import { authMiddleware, roleMiddleware } from "@middleware";
+import { authMiddleware, roleMiddleware, singleImageUpload } from "@middleware";
 import { USER_ROLE } from "common/common.schema";
 
 export const doctorRouter = Router();
 
 const doctorController = new DoctorController(appContext.services.doctorService);
 
-doctorRouter.get("/", doctorController.getAllDoctors);
+// Was unauthenticated until this change — returned the full internal
+// Staff+DoctorProfile record (email, mobile, fees, registration number) to
+// anyone. Same access pattern as the sibling /doctors/basic route below.
+doctorRouter.get(
+    "/",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    doctorController.getAllDoctors,
+);
 
 doctorRouter.get("/basic", 
     authMiddleware,
@@ -18,7 +26,13 @@ doctorRouter.get("/basic",
     doctorController.getBasicDoctors.bind(doctorController)
 );
 
-doctorRouter.get("/:id", doctorController.getDoctorById);
+// Was unauthenticated until this change — same leak as GET "/" above.
+doctorRouter.get(
+    "/:id",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    doctorController.getDoctorById,
+);
 
 doctorRouter.post(
     "/create",
@@ -26,6 +40,24 @@ doctorRouter.post(
     roleMiddleware(USER_ROLE.ADMIN),
     validate(createDoctorSchema),
     doctorController.createDoctor.bind(doctorController)
+);
+
+// Photo management — decoupled from doctor creation/editing, its own admin
+// surface. "type" is "card" (Doctors grid headshot) or "pose" (hero carousel
+// transparent cutout), validated in the controller.
+doctorRouter.post(
+    "/:id/photos/:type",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN),
+    singleImageUpload("photo"),
+    doctorController.uploadDoctorPhoto,
+);
+
+doctorRouter.delete(
+    "/:id/photos/:type",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN),
+    doctorController.deleteDoctorPhoto,
 );
 
 doctorRouter.patch(

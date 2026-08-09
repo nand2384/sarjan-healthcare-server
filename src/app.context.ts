@@ -43,6 +43,13 @@ import { ReviewCriterionRepository } from "@modules/review-criterion/review-crit
 import { ReviewCriterionService } from "@modules/review-criterion/review-criterion.service";
 import { ReviewRepository } from "@modules/review/review.repository";
 import { ReviewService } from "@modules/review/review.service";
+import { StorageService } from "@modules/storage/storage.service";
+import { ClinicProfileRepository } from "@modules/clinic-profile/clinic-profile.repository";
+import { ClinicProfileService } from "@modules/clinic-profile/clinic-profile.service";
+import { VideoCategoryRepository } from "@modules/video-category/video-category.repository";
+import { VideoCategoryService } from "@modules/video-category/video-category.service";
+import { VideoRepository } from "@modules/video/video.repository";
+import { VideoService } from "@modules/video/video.service";
 import { WhatsAppService } from "whatsapp";
 
 const auditRepository = new AuditRepository(prisma);
@@ -81,13 +88,24 @@ const releaseNoteService = new ReleaseNoteService(prisma, releaseNoteRepository,
 const reviewCriterionRepository = new ReviewCriterionRepository(prisma);
 const reviewCriterionService = new ReviewCriterionService(reviewCriterionRepository);
 
+const storageService = new StorageService();
+
+const clinicProfileRepository = new ClinicProfileRepository(prisma);
+const clinicProfileService = new ClinicProfileService(clinicProfileRepository);
+
+const videoCategoryRepository = new VideoCategoryRepository(prisma);
+const videoCategoryService = new VideoCategoryService(videoCategoryRepository);
+
+const videoRepository = new VideoRepository(prisma);
+const videoService = new VideoService(videoRepository);
+
 const reviewRepository = new ReviewRepository(prisma);
 const reviewService = new ReviewService(reviewRepository, reviewCriterionService, systemSettingService, staffRepository, notificationService);
 
 const staffService = new StaffService(prisma, staffRepository, staffRoleRepository, masterRepository, auditService, mailerService, authService, notificationService);
 
 const doctorRepository = new DoctorRepository(prisma);
-const doctorService = new DoctorService(prisma, doctorRepository, staffRepository, staffRoleRepository, auditService, mailerService);
+const doctorService = new DoctorService(prisma, doctorRepository, staffRepository, staffRoleRepository, auditService, mailerService, storageService);
 
 const patientOtpRepository = new PatientOtpRepository(prisma);
 const patientOtpService = new PatientOtpService(patientOtpRepository, whatsAppService);
@@ -142,6 +160,10 @@ export const appContext = Object.freeze({
         releaseNoteService,
         reviewCriterionService,
         reviewService,
+        storageService,
+        clinicProfileService,
+        videoCategoryService,
+        videoService,
     },
 });
 

@@ -8,3 +8,4 @@ export * from "./validate.middleware";
 export { authMiddleware } from "./auth.middleware";
 export { roleMiddleware } from "./role.middleware";
 export { maintenanceMiddleware } from "./maintenance.middleware";
+export { singleImageUpload } from "./upload.middleware";

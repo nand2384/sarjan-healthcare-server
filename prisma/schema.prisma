@@ -348,7 +348,12 @@ model DoctorProfile {
 
   biography String?
 
-  profile_image_url String?
+  // Storage object keys (not URLs) — the public URL is derived on read via
+  // StorageService.getPublicUrl(key), so a bucket/CDN domain change never
+  // needs a data migration. Admin uploads both themselves via the doctor
+  // photo management UI, decoupled from doctor creation.
+  card_photo_key String? // regular headshot — Doctors grid
+  pose_photo_key String? // pre-cut transparent PNG — hero carousel
 
   experience String?
 
@@ -1032,4 +1037,60 @@ model ReviewRating {
 
   @@unique([review_id, criterion_id])
   @@map("review_rating")
+}
+
+// Singleton settings-like record — contact/address/hours + the About
+// section's blurb, editable from the admin Clinic Profile page. Service
+// layer enforces exactly one row (id 1, seeded on migration).
+model ClinicProfile {
+  clinic_profile_id Int @id @default(autoincrement())
+
+  address           String
+  phone             String
+  email             String
+  timings           String
+  days_open         String
+  about_description String @db.Text
+
+  updated_at DateTime @updatedAt
+
+  @@map("clinic_profile")
+}
+
+// Admin-managed grouping for landing-page YouTube videos — mirrors
+// ReviewCriterion's shape (display_order + is_active soft-toggle).
+model VideoCategory {
+  video_category_id Int @id @default(autoincrement())
+
+  name          String
+  description   String?
+  display_order Int     @default(0)
+  is_active     Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  videos Video[]
+
+  @@map("video_category")
+}
+
+model Video {
+  video_id          Int @id @default(autoincrement())
+  video_category_id Int
+
+  title            String
+  youtube_url      String // raw pasted URL, kept for admin edit convenience
+  youtube_video_id String // extracted at create/update time — drives embed src + thumbnail CDN URL
+
+  display_order Int     @default(0)
+  is_active     Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  category VideoCategory @relation(fields: [video_category_id], references: [video_category_id])
+
+  @@index([video_category_id])
+  @@map("video")
 }
