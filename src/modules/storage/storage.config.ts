@@ -6,7 +6,11 @@ export const storageConfig = {
     accessKeyId: env.STORAGE_ACCESS_KEY_ID,
     secretAccessKey: env.STORAGE_SECRET_ACCESS_KEY,
     bucket: env.STORAGE_BUCKET,
-    publicUrlBase: env.STORAGE_PUBLIC_URL_BASE,
+    // Strip any trailing slash(es) — StorageService.getPublicUrl() joins this
+    // with the object key via a single "/", so a trailing slash on the env
+    // var (easy to paste in by accident) would silently double up into
+    // ".../bucket//key" and 404 against Supabase's storage API.
+    publicUrlBase: env.STORAGE_PUBLIC_URL_BASE?.replace(/\/+$/, ""),
 };
 
 /**
