@@ -25,10 +25,13 @@ receptionistRouter.get(
 );
 
 
+// Also reachable by a doctor viewing their own queue (self-service dashboard)
+// — the controller enforces that a DOCTOR-only caller can only pass their own
+// staff_id as :id, so this doesn't let one doctor see another's queue.
 receptionistRouter.get(
-    "/dashboard/doctor/:id", 
+    "/dashboard/doctor/:id",
     authMiddleware,
-    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST, USER_ROLE.DOCTOR, USER_ROLE.LEAD_DOCTOR),
     receptionistController.getDoctorDashboardData.bind(receptionistController)
 );
 
@@ -39,10 +42,14 @@ receptionistRouter.patch(
     receptionistController.checkInPatient.bind(receptionistController)
 );
 
+// Also reachable by a doctor starting/completing their own consultation —
+// the controller restricts a DOCTOR-only caller to those two transitions on
+// their own patients only; front-desk-only transitions (check-in, cancel,
+// walk-out, awaiting-payment) still require admin/receptionist.
 receptionistRouter.patch(
     "/appointments/:id/status",
     authMiddleware,
-    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST, USER_ROLE.DOCTOR, USER_ROLE.LEAD_DOCTOR),
     validate(updateAppointmentStatusSchema),
     receptionistController.updateAppointmentStatus.bind(receptionistController)
 );

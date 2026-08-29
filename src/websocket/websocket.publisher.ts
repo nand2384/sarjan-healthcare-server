@@ -4,12 +4,14 @@ import { SocketEvent, SocketRoom } from "./websocket.constants";
 
 export class WebSocketPublisher {
     /**
-     * Emits a queue update event to receptionists (except the sender).
+     * Emits a queue update event to receptionists (except the sender), and to
+     * the specific doctor whose queue changed (except when they triggered it
+     * themselves — e.g. completing their own consultation).
      * @param payload The queue data to send.
      * @param senderStaffId The staff ID of the user triggering the update.
-     * @param _doctorStaffId The staff ID of the specific doctor whose queue is updating (for future use).
+     * @param doctorStaffId The staff ID of the specific doctor whose queue is updating.
      */
-    static queueUpdated(payload: any, senderStaffId: number, _doctorStaffId?: number): void {
+    static queueUpdated(payload: any, senderStaffId: number, doctorStaffId?: number): void {
         const websocketService = getWebSocketService();
 
         // 1. Broadcast to all receptionists EXCEPT the one who triggered this update
@@ -21,16 +23,13 @@ export class WebSocketPublisher {
         );
 
         // 2. Broadcast directly to the specific doctor, ONLY if they didn't trigger it themselves
-        // TODO: Uncomment this when the doctor's dashboard is ready
-        /*
-        if (senderStaffId !== doctorStaffId) {
+        if (doctorStaffId && senderStaffId !== doctorStaffId) {
             websocketService.emitToStaff(
                 doctorStaffId,
                 SocketEvent.QUEUE_UPDATED,
                 payload
             );
         }
-        */
     }
 
     /**
@@ -76,6 +75,23 @@ export class WebSocketPublisher {
      */
     static rolesUpdated(staffId: number): void {
         getWebSocketService().emitToStaff(staffId, SocketEvent.ROLES_UPDATED, {});
+    }
+
+    /**
+     * Tells every other connected admin that a staff/doctor record changed
+     * (created, edited, disabled, restored, unlocked, deleted, roles/level
+     * changed, photo updated) so an open Staff/Doctor Management page can
+     * refetch live instead of only reflecting the acting admin's own local
+     * cache patch. Payload carries just the id — the client refetches, same
+     * "server is the source of truth" pattern as `notificationCreated`.
+     */
+    static staffUpdated(staffId: number, actorStaffId: number): void {
+        getWebSocketService().emitToRoleExcept(
+            USER_ROLE.ADMIN,
+            actorStaffId,
+            SocketEvent.STAFF_UPDATED,
+            { staffId }
+        );
     }
 
     /**

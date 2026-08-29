@@ -14,6 +14,8 @@ import { AuditAction, AuditEntityType, DayOfWeek } from "@generated/prisma/clien
 import { logger } from "@logger";
 import { StorageService } from "@modules/storage/storage.service";
 import { formatSlotTime12Hour } from "utils/appointment-time.util";
+import { USER_ROLE_ID, DOCTOR_ROLE_IDS } from "common/common.schema";
+import { WebSocketPublisher } from "websocket";
 
 const PHOTO_TYPES = ["card", "pose"] as const;
 export type DoctorPhotoType = (typeof PHOTO_TYPES)[number];
@@ -145,10 +147,11 @@ export class DoctorService {
                     tx,
                 );
 
-                // Assign Doctor Role (Role ID 2)
+                // New doctors always start as plain Doctor — promotion to Lead
+                // Doctor is a separate action (see updateDoctorLevel below).
                 const assignedRole = await this.staffRoleRepository.assignRole(
                     staff.staff_id,
-                    2,
+                    USER_ROLE_ID.DOCTOR,
                     tx,
                 );
 
@@ -205,6 +208,8 @@ export class DoctorService {
             logger.error(error, "Failed to send doctor activation email.");
         });
 
+        WebSocketPublisher.staffUpdated(staff.staff_id, auditContext.performed_by_staff_id);
+
         return this.getDoctorById(staff.staff_id);
     }
 
@@ -259,6 +264,53 @@ export class DoctorService {
                 new_values: dto as any,
             }, tx);
         });
+
+        WebSocketPublisher.staffUpdated(staffId, auditContext.performed_by_staff_id);
+
+        return this.getDoctorById(staffId);
+    }
+
+    /**
+     * Promotes/demotes a doctor between "Doctor" and "Lead Doctor". These are
+     * mutually exclusive — Lead Doctor replaces Doctor for that person rather
+     * than being held alongside it — so this removes whichever of
+     * DOCTOR_ROLE_IDS they currently hold and assigns the requested one.
+     */
+    public async updateDoctorLevel(
+        staffId: number,
+        level: "DOCTOR" | "LEAD_DOCTOR",
+        auditContext: { performed_by_staff_id: number, ip_address: string, user_agent: string },
+    ) {
+        await this.getDoctorById(staffId);
+
+        const targetRoleId = level === "LEAD_DOCTOR" ? USER_ROLE_ID.LEAD_DOCTOR : USER_ROLE_ID.DOCTOR;
+
+        await this.prisma.$transaction(async (tx) => {
+            const currentRoles = await this.staffRoleRepository.findRolesByStaffId(staffId, tx);
+            const currentDoctorRole = currentRoles.find((sr) => (DOCTOR_ROLE_IDS as readonly number[]).includes(sr.role_id));
+
+            if (currentDoctorRole && currentDoctorRole.role_id !== targetRoleId) {
+                await this.staffRoleRepository.removeRole(staffId, currentDoctorRole.role_id, tx);
+            }
+            if (!currentDoctorRole || currentDoctorRole.role_id !== targetRoleId) {
+                await this.staffRoleRepository.assignRole(staffId, targetRoleId, tx);
+            }
+
+            await this.auditService.log({
+                ...auditContext,
+                entity_type: AuditEntityType.DOCTOR,
+                entity_id: staffId.toString(),
+                action: AuditAction.UPDATE,
+                old_values: {},
+                new_values: { level },
+            }, tx);
+        });
+
+        // Target staff member's client refetches /auth/me instead of continuing on a stale role set.
+        // Also tells other admins' staff/doctor list views to refetch —
+        // rolesUpdated alone only reaches the affected staff member's own client.
+        WebSocketPublisher.rolesUpdated(staffId);
+        WebSocketPublisher.staffUpdated(staffId, auditContext.performed_by_staff_id);
 
         return this.getDoctorById(staffId);
     }

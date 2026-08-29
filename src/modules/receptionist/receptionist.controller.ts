@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { ReceptionistService } from "./receptionist.service";
 import { AppError, ErrorCode } from "@errors";
+import { USER_ROLE } from "common/common.schema";
 
 export class ReceptionistController {
     constructor(private readonly receptionistService: ReceptionistService) {}
@@ -35,7 +36,17 @@ export class ReceptionistController {
         if (isNaN(doctorId)) {
             throw new AppError(400, ErrorCode.BAD_REQUEST, "Invalid doctor ID");
         }
-        
+
+        // A caller with only the DOCTOR role (no admin/receptionist access)
+        // may only view their own queue — this route also allows the
+        // DOCTOR role for the self-service dashboard, so this is the only
+        // thing stopping one doctor from reading another's patient queue.
+        const roles = req.session?.roles ?? [];
+        const isPrivileged = roles.includes(USER_ROLE.ADMIN) || roles.includes(USER_ROLE.RECEPTIONIST);
+        if (!isPrivileged && doctorId !== req.session?.staff_id) {
+            throw new AppError(403, ErrorCode.FORBIDDEN, "You can only view your own dashboard.");
+        }
+
         const data = await this.receptionistService.getDoctorDashboardData(doctorId);
         return res.status(200).json({
             success: true,
@@ -80,7 +91,19 @@ export class ReceptionistController {
             throw new AppError(401, ErrorCode.UNAUTHORIZED, "User not authenticated");
         }
 
-        const data = await this.receptionistService.updateAppointmentStatus(appointmentId, status, staffId);
+        // A caller with only the DOCTOR role (no admin/receptionist access) may
+        // only move their own patients through the two transitions a doctor
+        // actually triggers — starting and finishing a consultation. Front-desk
+        // actions (check-in, cancel, walk-out, awaiting-payment) stay
+        // receptionist/admin-only even though this route now also accepts DOCTOR.
+        const roles = req.session?.roles ?? [];
+        const isPrivileged = roles.includes(USER_ROLE.ADMIN) || roles.includes(USER_ROLE.RECEPTIONIST);
+        if (!isPrivileged && !['in-consultation', 'completed'].includes(status)) {
+            throw new AppError(403, ErrorCode.FORBIDDEN, "Doctors can only start or complete a consultation.");
+        }
+        const restrictToDoctorStaffId = isPrivileged ? undefined : staffId;
+
+        const data = await this.receptionistService.updateAppointmentStatus(appointmentId, status, staffId, restrictToDoctorStaffId);
         return res.status(200).json({
             success: true,
             message: "Appointment status updated successfully",

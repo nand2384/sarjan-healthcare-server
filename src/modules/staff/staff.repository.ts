@@ -1,7 +1,7 @@
 import { Prisma, PrismaClient, Staff } from "@generated/prisma/client";
 import { StaffDetailEntity, StaffListEntity } from "./staff.types";
 
-import { USER_ROLE_ID } from "../../common/common.schema";
+import { DOCTOR_ROLE_IDS, USER_ROLE_ID } from "../../common/common.schema";
 
 export class StaffRepository {
     constructor(private readonly prisma: PrismaClient) {}
@@ -18,7 +18,7 @@ export class StaffRepository {
             is_system_account: false,
             staff_roles: {
                 none: {
-                    role_id: USER_ROLE_ID.DOCTOR
+                    role_id: { in: DOCTOR_ROLE_IDS }
                 }
             }
         };

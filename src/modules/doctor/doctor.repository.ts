@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient, DoctorProfile, DayOfWeek } from "@generated/prisma/client";
 import { DoctorListEntity, DoctorDetailEntity } from "./doctor.types";
+import { DOCTOR_ROLE_IDS } from "common/common.schema";
 
 export class DoctorRepository {
     constructor(private readonly prisma: PrismaClient) {}
@@ -13,7 +14,7 @@ export class DoctorRepository {
                 is_system_account: false,
                 staff_roles: {
                     some: {
-                        role_id: 2, // Role ID 2 is Doctor (seeded order: 1=admin, 2=doctor)
+                        role_id: { in: DOCTOR_ROLE_IDS }, // Doctor or Lead Doctor
                     }
                 }
             },
@@ -160,7 +161,7 @@ export class DoctorRepository {
                 deleted_at: null,
                 is_system_account: false,
                 is_disabled: false,
-                staff_roles: { some: { role_id: 2 } },
+                staff_roles: { some: { role_id: { in: DOCTOR_ROLE_IDS } } },
                 doctor_profile: { is_visible_on_website: true },
             },
             orderBy: { doctor_profile: { display_order: "asc" } },
@@ -189,7 +190,7 @@ export class DoctorRepository {
                 deleted_at: null,
                 is_system_account: false,
                 is_disabled: false,
-                staff_roles: { some: { role_id: 2 } },
+                staff_roles: { some: { role_id: { in: DOCTOR_ROLE_IDS } } },
                 doctor_profile: { is_visible_on_website: true },
             },
             select: {
@@ -220,7 +221,7 @@ export class DoctorRepository {
                 // is_account_activated: true,
                 staff_roles: {
                     some: {
-                        role_id: 2,
+                        role_id: { in: DOCTOR_ROLE_IDS },
                     }
                 },
             },
@@ -309,7 +310,7 @@ export class DoctorRepository {
                     deleted_at: null,
                     is_system_account: false,
                     is_disabled: false,
-                    staff_roles: { some: { role_id: 2 } },
+                    staff_roles: { some: { role_id: { in: DOCTOR_ROLE_IDS } } },
                     doctor_profile: { is_visible_on_website: true, is_accepting_appointments: true },
                 },
             },

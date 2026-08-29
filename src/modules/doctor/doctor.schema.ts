@@ -35,6 +35,11 @@ export const updateDoctorSchema = createDoctorSchema.partial().extend({
 });
 export type UpdateDoctorDto = z.infer<typeof updateDoctorSchema>;
 
+export const updateDoctorLevelSchema = z.object({
+    level: z.enum(["DOCTOR", "LEAD_DOCTOR"]),
+});
+export type UpdateDoctorLevelDto = z.infer<typeof updateDoctorLevelSchema>;
+
 export const doctorAvailabilitySlotSchema = z.object({
     day_of_week: z.nativeEnum(DayOfWeek),
     slot_name: z.string().trim().min(1, "Slot name is required"),

@@ -32,6 +32,11 @@ export async function seedMaster() {
                     description: "Developer",
                     display_order: 5,
                 },
+                {
+                    role_name: "Lead Doctor",
+                    description: "Doctor with clinic-wide configuration permissions",
+                    display_order: 6,
+                },
             ],
             skipDuplicates: true,
         });

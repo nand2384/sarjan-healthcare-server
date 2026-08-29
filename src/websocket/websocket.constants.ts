@@ -10,6 +10,7 @@ export enum SocketEvent {
     SCHEDULE_UPDATED = "schedule.updated",
     REPORT_UPDATED = "report.updated",
     ROLES_UPDATED = "staff.roles-updated",
+    STAFF_UPDATED = "staff.updated",
     MAINTENANCE_MODE_CHANGED = "system.maintenance-mode-changed",
     SESSION_REVOKED = "session.revoked",
 }

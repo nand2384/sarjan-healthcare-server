@@ -24,6 +24,10 @@ import { clinicProfileRouter } from "@modules/clinic-profile/clinic-profile.rout
 import { videoCategoryRouter } from "@modules/video-category/video-category.routes";
 import { videoRouter } from "@modules/video/video.routes";
 import { publicRouter } from "@modules/public/public.routes";
+import { labRouter } from "@modules/lab/lab.routes";
+import { referralRouter } from "@modules/referral/referral.routes";
+import { catalogRouter } from "@modules/catalog/catalog.routes";
+import { consultationRouter } from "@modules/consultation/consultation.routes";
 
 // Remove on removing redis/clear API
 import { env } from "@config";
@@ -60,6 +64,10 @@ router.use("/reviews", reviewRouter);
 router.use("/clinic-profile", clinicProfileRouter);
 router.use("/video-categories", videoCategoryRouter);
 router.use("/videos", videoRouter);
+router.use("/lab-results", labRouter);
+router.use("/referrals", referralRouter);
+router.use("/catalog", catalogRouter);
+router.use("/consultations", consultationRouter);
 router.use("/public", publicReviewRouter);
 router.use("/public", publicRouter);
 

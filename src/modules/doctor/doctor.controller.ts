@@ -57,6 +57,19 @@ export class DoctorController {
         });
     };
 
+    public updateDoctorLevel = async (
+        req: Request,
+        res: Response,
+    ) => {
+        const staffId = Number(req.params.id);
+        const doctor = await this.doctorService.updateDoctorLevel(staffId, req.body.level, req.auditContext);
+
+        return res.status(200).json({
+            message: "Doctor level updated successfully.",
+            data: doctor,
+        });
+    };
+
     public uploadDoctorPhoto = async (req: Request, res: Response) => {
         const staffId = Number(req.params.id);
         const type = req.params.type as DoctorPhotoType;
@@ -73,6 +86,11 @@ export class DoctorController {
             originalname: req.file.originalname,
         });
 
+        const actorStaffId = req.session?.staff_id;
+        if (actorStaffId) {
+            WebSocketPublisher.staffUpdated(staffId, actorStaffId);
+        }
+
         return res.status(200).json({
             message: "Photo uploaded successfully.",
             data: result,
@@ -87,6 +105,11 @@ export class DoctorController {
         }
 
         await this.doctorService.deleteDoctorPhoto(staffId, type);
+
+        const actorStaffId = req.session?.staff_id;
+        if (actorStaffId) {
+            WebSocketPublisher.staffUpdated(staffId, actorStaffId);
+        }
 
         return res.status(200).json({
             message: "Photo deleted successfully.",

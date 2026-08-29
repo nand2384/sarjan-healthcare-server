@@ -4,6 +4,7 @@ import { logger } from "@logger";
 import { cancelReminder } from "../../queues/reminder.queue";
 import { cancelNoShowCheck } from "../../queues/no-show.queue";
 import { getAppointmentStartInstantUTC, getAppointmentEndInstantUTC, getTodayAsAppointmentDateUTC } from "utils/appointment-time.util";
+import { DOCTOR_ROLE_IDS } from "common/common.schema";
 
 export interface AppointmentHistoryFilters {
     startDate: Date;
@@ -22,7 +23,7 @@ export class ReceptionistRepository {
     public async getDoctorsInOpd(today: Date, tomorrow: Date) {
         return this.prisma.staff.findMany({
             where: {
-                staff_roles: { some: { role_id: 2 } },
+                staff_roles: { some: { role_id: { in: DOCTOR_ROLE_IDS } } },
                 doctor_profile: { isNot: null }
             },
             select: {
@@ -287,7 +288,7 @@ export class ReceptionistRepository {
         });
     }
 
-    public async updateAppointmentStatusTx(appointmentId: number, targetStatusId: number, statusName: string, staffId: number) {
+    public async updateAppointmentStatusTx(appointmentId: number, targetStatusId: number, statusName: string, staffId: number, restrictToDoctorStaffId?: number) {
         return this.prisma.$transaction(async (tx) => {
             const appointment = await tx.appointment.findUnique({
                 where: { appointment_id: appointmentId },
@@ -295,6 +296,13 @@ export class ReceptionistRepository {
             });
 
             if (!appointment) throw new AppError(404, ErrorCode.NOT_FOUND, "Appointment not found");
+
+            // A doctor (no admin/receptionist access) may only move the status
+            // of their own patients' appointments — restrictToDoctorStaffId is
+            // only set for that case, never for privileged front-desk callers.
+            if (restrictToDoctorStaffId !== undefined && appointment.doctor_staff_id !== restrictToDoctorStaffId) {
+                throw new AppError(403, ErrorCode.FORBIDDEN, "You can only update your own patients' appointments.");
+            }
 
             const updatedAppt = await tx.appointment.update({
                 where: { appointment_id: appointmentId },

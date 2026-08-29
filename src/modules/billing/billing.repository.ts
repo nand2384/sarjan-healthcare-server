@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma } from "@generated/prisma/client";
 import { AppError, ErrorCode } from "@errors";
 import { CreateTestCatalogDto, UpdateTestCatalogDto, UpdateDoctorFeesDto, CheckoutPaymentMethod } from "./billing.dto";
+import { DOCTOR_ROLE_IDS } from "common/common.schema";
 
 export class BillingRepository {
     constructor(private readonly prisma: PrismaClient) {}
@@ -85,7 +86,7 @@ export class BillingRepository {
         return prisma.staff.findMany({
             where: {
                 deleted_at: null,
-                staff_roles: { some: { role_id: 2 } } // Role ID 2 is Doctor
+                staff_roles: { some: { role_id: { in: DOCTOR_ROLE_IDS } } } // Doctor or Lead Doctor
             },
             orderBy: { first_name: "asc" },
             select: {

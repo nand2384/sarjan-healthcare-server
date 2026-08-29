@@ -64,6 +64,12 @@ enum QueueType {
   WALK_IN
 }
 
+enum TestResultStatus {
+  ORDERED
+  IN_PROGRESS
+  COMPLETED
+}
+
 enum PasskeyDeviceType {
   SINGLE_DEVICE
   MULTI_DEVICE
@@ -179,7 +185,7 @@ model Staff {
 
   failed_login_count             Int       @default(0)
   failed_login_window_started_at DateTime?
-  locked_until                    DateTime?
+  locked_until                   DateTime?
 
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
@@ -193,9 +199,9 @@ model Staff {
   password_reset_token            String?   @unique
   password_reset_token_expires_at DateTime?
 
-  pending_email                    String?
-  pending_email_token              String?   @unique
-  pending_email_token_expires_at   DateTime?
+  pending_email                  String?
+  pending_email_token            String?   @unique
+  pending_email_token_expires_at DateTime?
 
   current_challenge    String?
   challenge_created_at DateTime?
@@ -224,7 +230,8 @@ model Staff {
   announcements_created  Announcement[] @relation("AnnouncementCreatedBy")
   announcements_targeted Announcement[] @relation("AnnouncementTargetStaff")
 
-  test_orders_placed TestOrder[] @relation("TestOrderedBy")
+  test_orders_placed      TestOrder[] @relation("TestOrderedBy")
+  test_results_entered_by TestOrder[] @relation("TestResultEnteredBy")
 
   payments_collected Payment[] @relation("PaymentCollectedBy")
   payments_refunded  Payment[] @relation("PaymentRefundedBy")
@@ -237,6 +244,17 @@ model Staff {
   release_notes_created ReleaseNote[] @relation("ReleaseNoteCreatedBy")
 
   reviews_received Review[] @relation("ReviewDoctor")
+
+  consultations_given       Consultation[] @relation("ConsultationDoctor")
+  consultations_referred_to Consultation[] @relation("ConsultationReferredTo")
+
+  referrals_made     PatientReferral[] @relation("PatientReferredBy")
+  referrals_received PatientReferral[] @relation("PatientReferredTo")
+  referrals_revoked  PatientReferral[] @relation("PatientReferralRevokedBy")
+
+  catalog_items           DoctorCatalogItem[]    @relation("CatalogItemDoctor")
+  catalog_items_created   DoctorCatalogItem[]    @relation("CatalogItemCreatedBy")
+  catalog_item_dismissals CatalogItemDismissal[] @relation("CatalogItemDismissedBy")
 
   @@index([gender_id])
   @@index([username])
@@ -276,10 +294,10 @@ model Patient {
   middle_name String?
   last_name   String
 
-  mobile_number       String?
-  whatsapp_number     String?
+  mobile_number        String?
+  whatsapp_number      String?
   whatsapp_verified_at DateTime?
-  email               String?
+  email                String?
 
   gender_id Int?
 
@@ -309,6 +327,9 @@ model Patient {
   reviews     Review[]
 
   otp_verifications PatientOtpVerification[]
+
+  consultations Consultation[]
+  referrals     PatientReferral[]
 
   @@index([gender_id])
   @@index([patient_account_id])
@@ -563,6 +584,8 @@ model Appointment {
   payment     Payment?
   review      Review?
 
+  consultation Consultation?
+
   @@index([patient_id])
   @@index([doctor_staff_id])
   @@index([doctor_availability_id])
@@ -663,17 +686,176 @@ model TestOrder {
 
   ordered_at DateTime @default(now())
 
-  patient          Patient      @relation(fields: [patient_id], references: [patient_id])
-  appointment      Appointment? @relation(fields: [appointment_id], references: [appointment_id])
-  test_catalog     TestCatalog  @relation(fields: [test_catalog_id], references: [test_catalog_id])
-  ordered_by_staff Staff        @relation("TestOrderedBy", fields: [ordered_by_staff_id], references: [staff_id])
+  status TestResultStatus @default(ORDERED)
+
+  // Free-text result summary + interpretation notes — entered by front-desk
+  // staff transcribing a lab report, or by the treating doctor directly.
+  result_value String?
+  result_notes String?
+
+  result_entered_by_staff_id Int?
+  result_entered_at          DateTime?
+
+  patient                 Patient      @relation(fields: [patient_id], references: [patient_id])
+  appointment             Appointment? @relation(fields: [appointment_id], references: [appointment_id])
+  test_catalog            TestCatalog  @relation(fields: [test_catalog_id], references: [test_catalog_id])
+  ordered_by_staff        Staff        @relation("TestOrderedBy", fields: [ordered_by_staff_id], references: [staff_id])
+  result_entered_by_staff Staff?       @relation("TestResultEnteredBy", fields: [result_entered_by_staff_id], references: [staff_id])
 
   payment_line_items PaymentLineItem[]
 
   @@index([patient_id])
   @@index([appointment_id])
+  @@index([status])
   @@index([test_catalog_id])
   @@map("test_order")
+}
+
+enum CatalogItemType {
+  SYMPTOM
+  DIAGNOSIS
+  MEDICINE
+  INVESTIGATION
+}
+
+model Consultation {
+  consultation_id Int @id @default(autoincrement())
+
+  appointment_id  Int @unique
+  patient_id      Int
+  doctor_staff_id Int
+
+  // Captured fresh at consult time — no earlier stage in the flow records vitals today.
+  vitals Json?
+
+  symptoms_list  Json?
+  symptoms_notes String?
+
+  diet      String?
+  sleep     String?
+  lifestyle String?
+
+  reported_allergies String[]
+
+  history_list        Json?
+  ongoing_medications Json?
+
+  cvs_heart_sounds String?
+  cvs_murmurs      String?
+  rs_air_entry     String?
+  rs_added_sounds  String?
+
+  diagnosis_list  String[]
+  diagnosis_notes String?
+
+  selected_tests String[]
+
+  prescribed_meds     Json?
+  prescription_advice String?
+
+  follow_up_days Int?
+
+  // Optional inline referral captured at consult completion — creates a
+  // matching PatientReferral row; standalone referrals from the My Patients
+  // list have no Consultation and go straight through PatientReferral.
+  referred_to_staff_id Int?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  appointment       Appointment @relation(fields: [appointment_id], references: [appointment_id])
+  patient           Patient     @relation(fields: [patient_id], references: [patient_id])
+  doctor            Staff       @relation("ConsultationDoctor", fields: [doctor_staff_id], references: [staff_id])
+  referred_to_staff Staff?      @relation("ConsultationReferredTo", fields: [referred_to_staff_id], references: [staff_id])
+
+  referrals PatientReferral[]
+
+  @@index([patient_id])
+  @@index([doctor_staff_id])
+  @@map("consultation")
+}
+
+model PatientReferral {
+  referral_id Int @id @default(autoincrement())
+
+  patient_id           Int
+  referred_by_staff_id Int
+  referred_to_staff_id Int
+
+  // Set when the referral originated inline at consultation completion, null
+  // when created standalone from the My Patients list.
+  consultation_id Int?
+
+  note String?
+
+  is_active Boolean @default(true)
+
+  revoked_by_staff_id Int?
+  revoked_at          DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  patient           Patient       @relation(fields: [patient_id], references: [patient_id])
+  referred_by_staff Staff         @relation("PatientReferredBy", fields: [referred_by_staff_id], references: [staff_id])
+  referred_to_staff Staff         @relation("PatientReferredTo", fields: [referred_to_staff_id], references: [staff_id])
+  revoked_by_staff  Staff?        @relation("PatientReferralRevokedBy", fields: [revoked_by_staff_id], references: [staff_id])
+  consultation      Consultation? @relation(fields: [consultation_id], references: [consultation_id])
+
+  @@index([patient_id])
+  @@index([referred_to_staff_id])
+  @@map("patient_referral")
+}
+
+model DoctorCatalogItem {
+  catalog_item_id Int             @id @default(autoincrement())
+  type            CatalogItemType
+  value           String
+
+  // Null = clinic-wide default (Lead Doctor curated). Non-null = personal to that doctor.
+  doctor_staff_id Int?
+
+  usage_count  Int       @default(0)
+  last_used_at DateTime?
+
+  // Default-only: Lead Doctor marks a default "generic, cannot be hidden" by an individual doctor.
+  is_pinned Boolean @default(false)
+
+  is_active Boolean @default(true)
+
+  created_by_staff_id Int
+  created_via         String // "AUTO_LEARNED" | "MANUAL"
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  doctor           Staff? @relation("CatalogItemDoctor", fields: [doctor_staff_id], references: [staff_id])
+  created_by_staff Staff  @relation("CatalogItemCreatedBy", fields: [created_by_staff_id], references: [staff_id])
+
+  dismissals CatalogItemDismissal[]
+
+  // Note: Postgres treats NULL as distinct in unique indexes, so this does
+  // NOT fully prevent duplicate global defaults (doctor_staff_id = null) at
+  // the DB level — the catalog service enforces that case with an explicit
+  // existence check before insert.
+  @@unique([type, doctor_staff_id, value])
+  @@index([type, doctor_staff_id])
+  @@map("doctor_catalog_item")
+}
+
+model CatalogItemDismissal {
+  dismissal_id Int @id @default(autoincrement())
+
+  catalog_item_id Int
+  doctor_staff_id Int
+
+  created_at DateTime @default(now())
+
+  catalog_item DoctorCatalogItem @relation(fields: [catalog_item_id], references: [catalog_item_id])
+  doctor       Staff             @relation("CatalogItemDismissedBy", fields: [doctor_staff_id], references: [staff_id])
+
+  @@unique([catalog_item_id, doctor_staff_id])
+  @@map("catalog_item_dismissal")
 }
 
 model Payment {
@@ -864,7 +1046,7 @@ model Report {
 
   reported_by_staff_id Int
   resolved_by_staff_id Int?
-  resolved_at           DateTime?
+  resolved_at          DateTime?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -881,7 +1063,7 @@ model Report {
 model ReportMessage {
   report_message_id Int @id @default(autoincrement())
 
-  report_id Int
+  report_id       Int
   sender_staff_id Int
 
   message String
@@ -919,7 +1101,7 @@ model EventLog {
   log_type EventLogType
   outcome  EventLogOutcome
 
-  subject String  // JOB_RUN: job name · ERROR: request URL · DELIVERY: recipient
+  subject String // JOB_RUN: job name · ERROR: request URL · DELIVERY: recipient
   message String? // failure/error detail, if any
 
   // JOB_RUN: {} · ERROR: {request_id, method, status_code, stack} · DELIVERY: {channel, subject_or_template}
@@ -990,8 +1172,8 @@ enum ReviewModerationStatus {
 model Review {
   review_id Int @id @default(autoincrement())
 
-  appointment_id Int @unique
-  patient_id     Int
+  appointment_id  Int @unique
+  patient_id      Int
   // Denormalized from the appointment at submission time — lets the admin
   // reviews list filter/query by doctor without joining through Appointment.
   doctor_staff_id Int

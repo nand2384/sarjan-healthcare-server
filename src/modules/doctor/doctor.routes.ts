@@ -2,7 +2,7 @@ import { Router } from "express";
 import { appContext } from "../../app.context";
 import { DoctorController } from "./doctor.controller";
 import { validate } from "@middleware";
-import { createDoctorSchema, updateDoctorSchema, doctorAvailabilitySlotSchema, doctorLeaveSchema } from "./doctor.schema";
+import { createDoctorSchema, updateDoctorSchema, updateDoctorLevelSchema, doctorAvailabilitySlotSchema, doctorLeaveSchema } from "./doctor.schema";
 import { authMiddleware, roleMiddleware, singleImageUpload } from "@middleware";
 import { USER_ROLE } from "common/common.schema";
 
@@ -20,9 +20,11 @@ doctorRouter.get(
     doctorController.getAllDoctors,
 );
 
-doctorRouter.get("/basic", 
+// Also reachable by DOCTOR/LEAD_DOCTOR — only name + specialization, needed
+// to populate the "refer to another doctor" picker in the consultation flow.
+doctorRouter.get("/basic",
     authMiddleware,
-    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST),
+    roleMiddleware(USER_ROLE.ADMIN, USER_ROLE.RECEPTIONIST, USER_ROLE.DOCTOR, USER_ROLE.LEAD_DOCTOR),
     doctorController.getBasicDoctors.bind(doctorController)
 );
 
@@ -66,6 +68,14 @@ doctorRouter.patch(
     roleMiddleware(USER_ROLE.ADMIN),
     validate(updateDoctorSchema),
     doctorController.updateDoctor.bind(doctorController)
+);
+
+doctorRouter.patch(
+    "/:id/level",
+    authMiddleware,
+    roleMiddleware(USER_ROLE.ADMIN),
+    validate(updateDoctorLevelSchema),
+    doctorController.updateDoctorLevel.bind(doctorController)
 );
 
 doctorRouter.get(

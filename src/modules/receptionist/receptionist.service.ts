@@ -112,7 +112,7 @@ export class ReceptionistService {
         return result;
     }
 
-    public async updateAppointmentStatus(appointmentId: number, statusName: string, staffId: number) {
+    public async updateAppointmentStatus(appointmentId: number, statusName: string, staffId: number, restrictToDoctorStaffId?: number) {
         const statusMap: Record<string, number> = {
             'waiting': 5,            // CHECKED_IN
             'in-consultation': 12,   // IN_CONSULTATION
@@ -126,7 +126,7 @@ export class ReceptionistService {
         const targetStatusId = statusMap[statusName];
         if (!targetStatusId) throw new AppError(400, ErrorCode.BAD_REQUEST, "Invalid status");
 
-        const result = await this.receptionistRepository.updateAppointmentStatusTx(appointmentId, targetStatusId, statusName, staffId);
+        const result = await this.receptionistRepository.updateAppointmentStatusTx(appointmentId, targetStatusId, statusName, staffId, restrictToDoctorStaffId);
 
         WebSocketPublisher.queueUpdated({ appointmentId }, staffId, result.doctor_staff_id);
 

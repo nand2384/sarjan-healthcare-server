@@ -158,6 +158,8 @@ export class StaffService {
             logger.error(error, "Failed to send staff activation email.");
         });
 
+        WebSocketPublisher.staffUpdated(staff.staff_id, auditContext.performed_by_staff_id);
+
         return {
             staff_id: staff.staff_id,
             first_name: staff.first_name,
@@ -223,6 +225,8 @@ export class StaffService {
                 old_values: oldValues,
                 new_values: primitiveData as any,
             });
+
+            WebSocketPublisher.staffUpdated(staffId, auditContext.performed_by_staff_id);
         }
 
         return await this.getStaffById(staffId);
@@ -264,8 +268,11 @@ export class StaffService {
         });
 
         // Post-commit — the target staff member's client refetches /auth/me
-        // instead of continuing to act on a stale role set.
+        // instead of continuing to act on a stale role set. Also tells other
+        // admins' staff/doctor list views to refetch — rolesUpdated alone
+        // only reaches the affected staff member's own client.
         WebSocketPublisher.rolesUpdated(staffId);
+        WebSocketPublisher.staffUpdated(staffId, auditContext.performed_by_staff_id);
 
         return await this.getStaffById(staffId);
     }
@@ -296,6 +303,7 @@ export class StaffService {
         });
 
         notifiedAdminIds.forEach((adminId) => this.notificationService.pingNew(adminId));
+        WebSocketPublisher.staffUpdated(staffId, auditContext.performed_by_staff_id);
 
         return data;
     }
@@ -326,12 +334,13 @@ export class StaffService {
         });
 
         notifiedAdminIds.forEach((adminId) => this.notificationService.pingNew(adminId));
+        WebSocketPublisher.staffUpdated(staffId, auditContext.performed_by_staff_id);
 
         return data;
     }
 
     public async unlockStaff(staffId: number, auditContext: { performed_by_staff_id: number, ip_address: string, user_agent: string }): Promise<StaffListEntity> {
-        return await this.prisma.$transaction(async (tx) => {
+        const staff = await this.prisma.$transaction(async (tx) => {
             const staff = await this.staffRepository.unlock(staffId, tx);
 
             await this.auditService.log({
@@ -344,6 +353,10 @@ export class StaffService {
 
             return staff;
         });
+
+        WebSocketPublisher.staffUpdated(staffId, auditContext.performed_by_staff_id);
+
+        return staff;
     }
 
     public async deleteStaff(staffId: number, auditContext: { performed_by_staff_id: number, ip_address: string, user_agent: string }) {
@@ -361,6 +374,8 @@ export class StaffService {
 
             return staff;
         });
+
+        WebSocketPublisher.staffUpdated(staffId, auditContext.performed_by_staff_id);
 
         return data;
     }

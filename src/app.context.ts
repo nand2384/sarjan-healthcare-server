@@ -44,6 +44,14 @@ import { ReviewCriterionService } from "@modules/review-criterion/review-criteri
 import { ReviewRepository } from "@modules/review/review.repository";
 import { ReviewService } from "@modules/review/review.service";
 import { StorageService } from "@modules/storage/storage.service";
+import { LabRepository } from "@modules/lab/lab.repository";
+import { LabService } from "@modules/lab/lab.service";
+import { ReferralRepository } from "@modules/referral/referral.repository";
+import { ReferralService } from "@modules/referral/referral.service";
+import { CatalogRepository } from "@modules/catalog/catalog.repository";
+import { CatalogService } from "@modules/catalog/catalog.service";
+import { ConsultationRepository } from "@modules/consultation/consultation.repository";
+import { ConsultationService } from "@modules/consultation/consultation.service";
 import { ClinicProfileRepository } from "@modules/clinic-profile/clinic-profile.repository";
 import { ClinicProfileService } from "@modules/clinic-profile/clinic-profile.service";
 import { VideoCategoryRepository } from "@modules/video-category/video-category.repository";
@@ -131,6 +139,18 @@ const announcementService = new AnnouncementService(prisma, announcementReposito
 const reportRepository = new ReportRepository(prisma);
 const reportService = new ReportService(prisma, reportRepository, staffRepository, notificationService);
 
+const labRepository = new LabRepository(prisma);
+const labService = new LabService(labRepository);
+
+const referralRepository = new ReferralRepository(prisma);
+const referralService = new ReferralService(referralRepository);
+
+const catalogRepository = new CatalogRepository(prisma);
+const catalogService = new CatalogService(catalogRepository);
+
+const consultationRepository = new ConsultationRepository(prisma);
+const consultationService = new ConsultationService(consultationRepository, referralRepository, referralService, catalogService, receptionistService);
+
 export const appContext = Object.freeze({
     logger,
     prisma,
@@ -164,6 +184,10 @@ export const appContext = Object.freeze({
         clinicProfileService,
         videoCategoryService,
         videoService,
+        labService,
+        referralService,
+        catalogService,
+        consultationService,
     },
 });
 
