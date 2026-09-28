@@ -16,7 +16,12 @@ export function startNoShowWorker(): void {
         async (job: Job<AppointmentNoShowJobData>) => {
             await appContext.services.receptionistService.markNoShowIfStillBooked(job.data.appointmentId);
         },
-        { connection: queueConnection },
+        {
+            connection: queueConnection,
+            // Idle-polling throttle — see reminder.worker.ts for the rationale.
+            drainDelay: 300,
+            stalledInterval: 300_000,
+        },
     );
 
     worker.on("failed", (job, error) => {

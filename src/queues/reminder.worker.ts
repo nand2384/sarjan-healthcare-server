@@ -16,7 +16,14 @@ export function startReminderWorker(): void {
         async (job: Job<AppointmentReminderJobData>) => {
             await appContext.services.whatsAppService.sendAppointmentReminder(job.data);
         },
-        { connection: queueConnection },
+        {
+            connection: queueConnection,
+            // Idle-polling throttle: BullMQ defaults (drainDelay 5s, stalledInterval 30s)
+            // cost ~150k Upstash commands/day per worker while idle. New and delayed
+            // jobs still wake the worker immediately via the marker key.
+            drainDelay: 300,
+            stalledInterval: 300_000,
+        },
     );
 
     worker.on("failed", (job, error) => {
