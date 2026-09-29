@@ -13,6 +13,7 @@ import crypto from "node:crypto";
 import { AuditAction, AuditEntityType, DayOfWeek } from "@generated/prisma/client";
 import { logger } from "@logger";
 import { StorageService } from "@modules/storage/storage.service";
+import { detectImageOrThrow } from "utils/file-signature.util";
 import { formatSlotTime12Hour } from "utils/appointment-time.util";
 import { USER_ROLE_ID, DOCTOR_ROLE_IDS } from "common/common.schema";
 import { WebSocketPublisher } from "websocket";
@@ -322,9 +323,12 @@ export class DoctorService {
             throw new AppError(404, ErrorCode.NOT_FOUND, "Doctor not found.");
         }
 
-        const extension = file.originalname.split(".").pop() || "jpg";
-        const key = `doctors/${staffId}/${type}-${Date.now()}.${extension}`;
-        await this.storageService.upload(file.buffer, key, file.mimetype);
+        // file.mimetype/originalname are client-supplied and not trusted for
+        // anything beyond multer's cheap first-pass filter — the extension and
+        // storage content type come from the file's actual bytes instead.
+        const detected = await detectImageOrThrow(file.buffer);
+        const key = `doctors/${staffId}/${type}-${Date.now()}.${detected.extension}`;
+        await this.storageService.upload(file.buffer, key, detected.mimeType);
 
         const previousKey = type === "card" ? existing.card_photo_key : existing.pose_photo_key;
         const field = type === "card" ? "card_photo_key" : "pose_photo_key";
