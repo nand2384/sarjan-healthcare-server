@@ -37,8 +37,6 @@ import { ReportRepository } from "@modules/report/report.repository";
 import { ReportService } from "@modules/report/report.service";
 import { EventLogRepository } from "@modules/event-log/event-log.repository";
 import { EventLogService } from "@modules/event-log/event-log.service";
-import { ReleaseNoteRepository } from "@modules/release-note/release-note.repository";
-import { ReleaseNoteService } from "@modules/release-note/release-note.service";
 import { ReviewCriterionRepository } from "@modules/review-criterion/review-criterion.repository";
 import { ReviewCriterionService } from "@modules/review-criterion/review-criterion.service";
 import { ReviewRepository } from "@modules/review/review.repository";
@@ -89,9 +87,6 @@ const masterService = new MasterService(masterRepository, redisClient, auditServ
 
 const notificationRepository = new NotificationRepository(prisma);
 const notificationService = new NotificationService(notificationRepository);
-
-const releaseNoteRepository = new ReleaseNoteRepository(prisma);
-const releaseNoteService = new ReleaseNoteService(prisma, releaseNoteRepository, auditService, staffRepository, notificationService);
 
 const reviewCriterionRepository = new ReviewCriterionRepository(prisma);
 const reviewCriterionService = new ReviewCriterionService(reviewCriterionRepository);
@@ -177,7 +172,6 @@ export const appContext = Object.freeze({
         reportService,
         whatsAppService,
         eventLogService,
-        releaseNoteService,
         reviewCriterionService,
         reviewService,
         storageService,
