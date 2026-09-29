@@ -56,19 +56,6 @@ export class WebSocketPublisher {
     }
 
     /**
-     * Tells each recipient's client that a specific report changed (new
-     * message or status update) so an open Developer Dashboard table, "Your
-     * Reports" list, or conversation view can refetch live — separate from
-     * `notificationCreated`, which only pings the bell.
-     */
-    static reportUpdated(reportId: number, recipientStaffIds: number[]): void {
-        const websocketService = getWebSocketService();
-        recipientStaffIds.forEach((staffId) =>
-            websocketService.emitToStaff(staffId, SocketEvent.REPORT_UPDATED, { reportId })
-        );
-    }
-
-    /**
      * Tells a staff member their role assignments changed, so their client
      * refetches `/auth/me` rather than keep acting on a stale role set.
      * Payload is intentionally empty — same pattern as `notificationCreated`.

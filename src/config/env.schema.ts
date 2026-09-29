@@ -39,6 +39,10 @@ export const envSchema = z.object({
     STORAGE_SECRET_ACCESS_KEY: z.string().optional(),
     STORAGE_BUCKET: z.string().optional(),
     STORAGE_PUBLIC_URL_BASE: z.string().optional(),
+    // Optional: where staff bug reports are emailed. Reports are always saved to
+    // the database; when unset they simply aren't emailed (leave the var out
+    // rather than empty — an empty string fails email validation).
+    REPORT_RECIPIENT_EMAIL: z.email().optional(),
     // Deployed-version panel — optionally set explicitly in the hosting
     // platform's env config at deploy time (e.g. Vercel auto-provides
     // VERCEL_GIT_COMMIT_SHA for client builds; map it to GIT_COMMIT_SHA here

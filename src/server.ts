@@ -5,7 +5,7 @@ import { appContext } from "./app.context";
 import { env } from "./config/env";
 import { connectDatabase } from "./database";
 import { redisClient } from "@cache";
-import { startSessionCleanupJob, startNotificationCleanupJob, startAppointmentReminderSweepJob, startDoctorShiftNoticeJob, startMonitoringLogCleanupJob, startAppointmentNoShowSweepJob } from "@scheduler";
+import { startSessionCleanupJob, startNotificationCleanupJob, startAppointmentReminderSweepJob, startDoctorShiftNoticeJob, startMonitoringLogCleanupJob, startAppointmentNoShowSweepJob, startReportEmailRetryJob } from "@scheduler";
 import { startReminderWorker } from "./queues/reminder.worker";
 import { startNoShowWorker } from "./queues/no-show.worker";
 import { shutdown } from "./shutdown";
@@ -25,6 +25,7 @@ async function startServer(): Promise<void> {
     startAppointmentNoShowSweepJob();
     startDoctorShiftNoticeJob();
     startMonitoringLogCleanupJob();
+    startReportEmailRetryJob();
     startReminderWorker();
     startNoShowWorker();
 

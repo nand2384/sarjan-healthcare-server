@@ -110,7 +110,7 @@ const videoService = new VideoService(videoRepository);
 const reviewRepository = new ReviewRepository(prisma);
 const reviewService = new ReviewService(reviewRepository, reviewCriterionService, systemSettingService, staffRepository, notificationService);
 
-const staffService = new StaffService(prisma, staffRepository, staffRoleRepository, masterRepository, auditService, mailerService, authService, notificationService);
+const staffService = new StaffService(prisma, staffRepository, staffRoleRepository, masterRepository, auditService, mailerService, authService, notificationService, sessionService);
 
 const doctorRepository = new DoctorRepository(prisma);
 const doctorService = new DoctorService(prisma, doctorRepository, staffRepository, staffRoleRepository, auditService, mailerService, storageService);
@@ -137,7 +137,7 @@ const announcementRepository = new AnnouncementRepository(prisma);
 const announcementService = new AnnouncementService(prisma, announcementRepository, staffRepository, notificationRepository, notificationService, mailerService);
 
 const reportRepository = new ReportRepository(prisma);
-const reportService = new ReportService(prisma, reportRepository, staffRepository, notificationService);
+const reportService = new ReportService(reportRepository, mailerService);
 
 const labRepository = new LabRepository(prisma);
 const labService = new LabService(labRepository);

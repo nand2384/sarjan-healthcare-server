@@ -84,6 +84,16 @@ export class SessionService {
             return null;
         }
 
+        // Cache-miss path only — disabling/deleting staff already revokes their
+        // sessions (StaffService), so a cached session can't outlive that. This
+        // catches anything that slipped past (e.g. a failed revoke) and stops
+        // a disabled account's session from being re-cached.
+        if (session.staff.is_disabled || session.staff.deleted_at) {
+            await this.deleteSession(session.session_id);
+
+            return null;
+        }
+
         const sessionData: RedisSessionData = {
             session_id: session.session_id,
             staff_id: Number(session.staff_id),

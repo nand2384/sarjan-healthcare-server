@@ -2,6 +2,22 @@ export interface SendMailOptions {
     to: string;
     subject: string;
     html: string;
+    replyTo?: string;
+}
+
+export interface SendBugReportMailOptions {
+    to: string;
+    replyTo?: string;
+    reportId: number;
+    reporterName: string;
+    reporterRoles: string[];
+    reporterUsername: string;
+    pageLabel: string;
+    pagePath: string;
+    description: string;
+    userAgent?: string;
+    submittedAtFormatted: string;
+    serverVersion: string;
 }
 
 export interface SendStaffActivationMailOptions {

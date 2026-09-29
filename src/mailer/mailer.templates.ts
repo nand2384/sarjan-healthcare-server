@@ -428,6 +428,61 @@ ${emailStatGrid([
     });
 }
 
+interface BugReportTemplateOptions {
+    reportId: number;
+    reporterName: string;
+    reporterRoles: string[];
+    reporterUsername: string;
+    pageLabel: string;
+    pagePath: string;
+    description: string;
+    userAgent?: string;
+    submittedAtFormatted: string;
+    serverVersion: string;
+}
+
+// Every value here is user-supplied (or user-influenced), and the shared
+// helpers above don't escape — so escape at the point of use.
+export function bugReportTemplate({
+    reportId,
+    reporterName,
+    reporterRoles,
+    reporterUsername,
+    pageLabel,
+    pagePath,
+    description,
+    userAgent,
+    submittedAtFormatted,
+    serverVersion,
+}: BugReportTemplateOptions): string {
+    const roles = reporterRoles.length > 0 ? reporterRoles.join(", ") : "—";
+
+    return emailLayout({
+        title: `Bug report #${reportId}`,
+        heading: `Bug report #${reportId}`,
+        eyebrow: "STAFF REPORT",
+        accentColor: BRAND.warning,
+        content: `
+<p style="margin-top: 0; margin-bottom: 12px; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94A3B8;">What they wrote</p>
+<div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px 18px; margin-bottom: 24px;">
+  <p style="margin: 0; white-space: pre-wrap; color: #0F172A; font-size: 15px; line-height: 1.6;">${escapeHtml(description)}</p>
+</div>
+
+${emailStatGrid([
+    { label: "Reported by", value: `${escapeHtml(reporterName)} (${escapeHtml(reporterUsername)})` },
+    { label: "Role", value: escapeHtml(roles) },
+    { label: "Page", value: escapeHtml(pageLabel) },
+    { label: "Page path", value: escapeHtml(pagePath || "—") },
+    { label: "Submitted", value: escapeHtml(submittedAtFormatted) },
+    { label: "Server version", value: escapeHtml(serverVersion) },
+    { label: "Device", value: escapeHtml(userAgent || "—") },
+])}
+
+${emailNoticeBox("Reply to this email to answer the reporter directly. The same report is also saved on the Reports page of the developer dashboard.", "info")}
+`,
+    });
+}
+
 export function announcementTemplate({ firstName, message, type }: AnnouncementTemplateOptions): string {
     const theme = ANNOUNCEMENT_THEME[type];
 

@@ -1033,13 +1033,28 @@ enum ReportStatus {
   RESOLVED
 }
 
+// Bug reports are now one-way (staff → developer email + this row). The
+// report_type / status / developer_notes / resolved_* columns and the
+// report_message table belong to the retired conversation workflow: nothing
+// writes them any more, and they're kept (not dropped) so old rows stay
+// readable and this change is purely additive.
 model Report {
   report_id Int @id @default(autoincrement())
 
-  report_type ReportType
+  report_type ReportType @default(BUG)
   page_path   String
   page_label  String
   description String
+
+  // Captured server-side from the request, not typed by the reporter.
+  user_agent String?
+
+  // Email delivery state. emailed_at stays null until the developer email is
+  // actually accepted by the mail server; the hourly retry job re-sends rows
+  // where it's still null (up to a max attempt count).
+  emailed_at       DateTime?
+  email_attempts   Int       @default(0)
+  email_last_error String?
 
   status          ReportStatus @default(OPEN)
   developer_notes String?

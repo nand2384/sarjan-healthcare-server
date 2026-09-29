@@ -2,19 +2,20 @@ import { env } from "@config";
 
 import { EventLogService } from "@modules/event-log/event-log.service";
 import { mailTransporter } from "./mailer.provider";
-import { staffActivationTemplate, doctorFeeMissingTemplate, passwordResetTemplate, emailChangeConfirmationTemplate, announcementTemplate, doctorShiftNoticeTemplate, securityAlertTemplate, accountLockedTemplate } from "./mailer.templates";
-import { SendMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions, SendPasswordResetMailOptions, SendEmailChangeConfirmationMailOptions, SendAnnouncementMailOptions, SendDoctorShiftNoticeMailOptions, SendSecurityAlertMailOptions, SendAccountLockedMailOptions } from "./mailer.types";
+import { bugReportTemplate, staffActivationTemplate, doctorFeeMissingTemplate, passwordResetTemplate, emailChangeConfirmationTemplate, announcementTemplate, doctorShiftNoticeTemplate, securityAlertTemplate, accountLockedTemplate } from "./mailer.templates";
+import { SendMailOptions, SendBugReportMailOptions, SendStaffActivationMailOptions, SendDoctorFeeMissingAlertOptions, SendPasswordResetMailOptions, SendEmailChangeConfirmationMailOptions, SendAnnouncementMailOptions, SendDoctorShiftNoticeMailOptions, SendSecurityAlertMailOptions, SendAccountLockedMailOptions } from "./mailer.types";
 
 export class MailerService {
     constructor(private readonly eventLogService: EventLogService) {}
 
-    async send({ to, subject, html }: SendMailOptions): Promise<void> {
+    async send({ to, subject, html, replyTo }: SendMailOptions): Promise<void> {
         try {
             await mailTransporter.sendMail({
                 from: env.EMAIL_FROM,
                 to,
                 subject,
                 html,
+                ...(replyTo && { replyTo }),
             });
         } catch (error) {
             this.eventLogService.recordDelivery({
@@ -49,6 +50,18 @@ export class MailerService {
                 username,
                 activationLink,
             }),
+        });
+    }
+
+    async sendBugReportMail({ to, replyTo, reportId, pageLabel, ...rest }: SendBugReportMailOptions): Promise<void> {
+        // Subject is plain text (not HTML), but cap it — pageLabel comes from the client.
+        const subject = `[Sarjan] Bug report #${reportId} — ${pageLabel}`.slice(0, 150);
+
+        await this.send({
+            to,
+            replyTo,
+            subject,
+            html: bugReportTemplate({ reportId, pageLabel, ...rest }),
         });
     }
 

@@ -19,6 +19,7 @@ import { UpdateStaffDto } from "./staff.schema";
 import { StaffListEntity } from "./staff.types";
 import { AuthService } from "@modules/auth/auth.service";
 import { NotificationService } from "@modules/notification/notification.service";
+import { SessionService } from "@modules/session/session.service";
 import { WebSocketPublisher } from "websocket";
 
 export class StaffService {
@@ -31,6 +32,7 @@ export class StaffService {
         private readonly mailerService: MailerService,
         private readonly authService: AuthService,
         private readonly notificationService: NotificationService,
+        private readonly sessionService: SessionService,
     ) {}
 
     /** Notifies other active admins (excluding the actor) inside an open transaction. Caller must ping post-commit. */
@@ -302,6 +304,12 @@ export class StaffService {
 
         });
 
+        // Post-commit, and not swallowed: a disabled account must not keep a live
+        // session. If this throws the disable itself is already saved (and is
+        // idempotent to retry); the session lookup also rejects disabled staff
+        // as a safety net once a session falls out of the Redis cache.
+        await this.sessionService.revokeAllSessionsForStaff(staffId);
+
         notifiedAdminIds.forEach((adminId) => this.notificationService.pingNew(adminId));
         WebSocketPublisher.staffUpdated(staffId, auditContext.performed_by_staff_id);
 
@@ -374,6 +382,9 @@ export class StaffService {
 
             return staff;
         });
+
+        // Same reasoning as disableStaff: end any live sessions post-commit.
+        await this.sessionService.revokeAllSessionsForStaff(staffId);
 
         WebSocketPublisher.staffUpdated(staffId, auditContext.performed_by_staff_id);
 

@@ -1,185 +1,112 @@
-import { PrismaClient, Prisma } from "@generated/prisma/client";
-import { ReportRepository, ListReportsFilters } from "./report.repository";
-import { StaffRepository } from "@modules/staff/staff.repository";
-import { NotificationService } from "@modules/notification/notification.service";
-import { CreateReportSchema, UpdateReportStatusSchema } from "./report.schema";
-import { AppError, ErrorCode } from "@errors";
+import { env, buildInfo } from "@config";
 import { logger } from "@logger";
-import { WebSocketPublisher } from "websocket";
+import { MailerService } from "mailer";
+import { ReportRepository } from "./report.repository";
+import { CreateReportSchema } from "./report.schema";
 
-const REPORT_TYPE_LABEL: Record<string, string> = {
-    BUG: "Bug/Error",
-    UPDATE: "Update Request",
-    FEATURE_REQUEST: "Feature Request",
-};
-
-const DEVELOPER_ROLE_NAME = "Developer";
-
-function reportActionUrl(reportId: number): string {
-    return `/reports/${reportId}`;
-}
+// Give up on a report's developer email after this many failed sends — it stays
+// readable on the Reports page either way.
+const MAX_EMAIL_ATTEMPTS = 5;
+// The retry job ignores reports younger than this so it can't double-send while
+// the inline first attempt is still in flight...
+const RETRY_MIN_AGE_MS = 10 * 60 * 1000;
+// ...and stops chasing reports older than this (the page still shows them).
+const RETRY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const RETRY_BATCH_SIZE = 20;
 
 export class ReportService {
     constructor(
-        private readonly prisma: PrismaClient,
         private readonly reportRepository: ReportRepository,
-        private readonly staffRepository: StaffRepository,
-        private readonly notificationService: NotificationService,
+        private readonly mailerService: MailerService,
     ) {}
 
-    private async getDeveloperStaffIds(excludeStaffId?: number, tx?: Prisma.TransactionClient): Promise<number[]> {
-        const developerRoleId = await this.reportRepository.findRoleIdByName(DEVELOPER_ROLE_NAME);
-        if (!developerRoleId) {
-            logger.warn("No Developer role found — skipping report notification fan-out");
-            return [];
-        }
-        const developers = await this.staffRepository.getActiveStaffIdsByRole(developerRoleId, excludeStaffId, tx);
-        return developers.map((developer) => developer.staff_id);
-    }
-
     /**
-     * Fire-and-forget from the reporter's side — no toast beyond success and no
-     * persisted "my reports" list is required to find this again (the floating
-     * widget's "Your Reports" tab and the notification's action_url both serve
-     * that instead). Developers are notified via the same in-app notification
-     * system Announcement uses.
+     * Saves the report, then emails it to the developer without making the
+     * reporter wait on SMTP. The saved row is the record of truth: if the email
+     * fails it stays unsent and the hourly retry job picks it up, and the
+     * developer can always read it on the Reports page.
      */
-    public async submit(dto: CreateReportSchema, reporterStaffId: number) {
-        let developerStaffIds: number[] = [];
-        let reportId = 0;
-
-        const report = await this.prisma.$transaction(async (tx) => {
-            const created = await this.reportRepository.create({
-                report_type: dto.report_type,
-                page_path: dto.page_path,
-                page_label: dto.page_label,
-                description: dto.description,
-                reported_by_staff_id: reporterStaffId,
-            }, tx);
-            reportId = created.report_id;
-
-            const reporter = await this.staffRepository.findById(reporterStaffId, tx);
-            const reporterName = reporter ? `${reporter.first_name} ${reporter.last_name}` : "A staff member";
-
-            developerStaffIds = await this.getDeveloperStaffIds(reporterStaffId, tx);
-
-            await Promise.all(developerStaffIds.map((staffId) =>
-                this.notificationService.notify(staffId, {
-                    title: `New ${REPORT_TYPE_LABEL[dto.report_type] ?? dto.report_type} report`,
-                    message: `From ${reporterName} — ${dto.page_label}: ${dto.description}`,
-                    type: "INFO",
-                    action_url: reportActionUrl(created.report_id),
-                }, tx)
-            ));
-
-            return created;
+    public async submit(dto: CreateReportSchema, reporterStaffId: number, userAgent?: string) {
+        const report = await this.reportRepository.create({
+            page_path: dto.page_path,
+            page_label: dto.page_label,
+            description: dto.description,
+            user_agent: userAgent,
+            reported_by_staff_id: reporterStaffId,
         });
 
-        // Post-commit: live-ping every developer's bell + refresh their reports table
-        developerStaffIds.forEach((staffId) => this.notificationService.pingNew(staffId));
-        WebSocketPublisher.reportUpdated(reportId, developerStaffIds);
+        void this.sendReportEmail(report.report_id);
 
-        return report;
+        return { report_id: report.report_id };
     }
 
-    public async list(page: number, limit: number, filters: ListReportsFilters) {
-        const { rows, total } = await this.reportRepository.list(page, limit, filters);
+    public async list(page: number, limit: number) {
+        const { rows, total } = await this.reportRepository.list(page, limit);
         return { rows, total, page, limit };
     }
 
-    public async getStatusCounts() {
-        return this.reportRepository.getStatusCounts();
+    /** Never throws — used fire-and-forget after submit and from the retry job. Returns whether the email was accepted. */
+    private async sendReportEmail(reportId: number): Promise<boolean> {
+        try {
+            if (!env.REPORT_RECIPIENT_EMAIL) {
+                logger.warn({ reportId }, "REPORT_RECIPIENT_EMAIL is not set — report saved but not emailed");
+                return false;
+            }
+
+            const report = await this.reportRepository.findForEmail(reportId);
+            if (!report) return false;
+
+            const reporter = report.reported_by;
+
+            try {
+                await this.mailerService.sendBugReportMail({
+                    to: env.REPORT_RECIPIENT_EMAIL,
+                    replyTo: reporter.email,
+                    reportId,
+                    reporterName: `${reporter.first_name} ${reporter.last_name}`,
+                    reporterRoles: reporter.staff_roles.map((staffRole) => staffRole.role.role_name),
+                    reporterUsername: reporter.username,
+                    pageLabel: report.page_label,
+                    pagePath: report.page_path,
+                    description: report.description,
+                    userAgent: report.user_agent ?? undefined,
+                    submittedAtFormatted: report.created_at.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }),
+                    serverVersion: `${env.APP_VERSION ?? buildInfo.fallbackVersion} (${env.GIT_COMMIT_SHA ?? buildInfo.fallbackCommit})`,
+                });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                logger.error({ err: error, reportId }, "Failed to email bug report");
+                await this.reportRepository.markEmailFailed(reportId, message);
+                return false;
+            }
+
+            await this.reportRepository.markEmailed(reportId);
+            return true;
+        } catch (error) {
+            logger.error({ err: error, reportId }, "Unexpected error while emailing bug report");
+            return false;
+        }
     }
 
-    public async listMine(staffId: number) {
-        return this.reportRepository.listMine(staffId);
-    }
-
-    /**
-     * The one piece of visibility the original reporter gets pushed to them — a
-     * single notification with the outcome, deep-linking into the same
-     * conversation thread they can also reach via the widget's "Your Reports" tab.
-     */
-    public async updateStatus(reportId: number, dto: UpdateReportStatusSchema, actorStaffId: number) {
-        const existing = await this.reportRepository.findById(reportId);
-        if (!existing) {
-            throw new AppError(404, ErrorCode.NOT_FOUND, "Report not found");
+    /** Called by the hourly retry job. */
+    public async retryUnsentEmails(): Promise<{ attempted: number; sent: number; failed: number }> {
+        if (!env.REPORT_RECIPIENT_EMAIL) {
+            return { attempted: 0, sent: 0, failed: 0 };
         }
 
-        const updated = await this.reportRepository.updateStatus(reportId, {
-            status: dto.status,
-            developer_notes: dto.developer_notes,
-            resolved_by_staff_id: actorStaffId,
-        });
+        const now = Date.now();
+        const pending = await this.reportRepository.findUnsentEmails(
+            MAX_EMAIL_ATTEMPTS,
+            new Date(now - RETRY_MIN_AGE_MS),
+            new Date(now - RETRY_MAX_AGE_MS),
+            RETRY_BATCH_SIZE,
+        );
 
-        const statusLabel = dto.status.replace(/_/g, " ").toLowerCase();
-        await this.notificationService.notify(updated.reported_by_staff_id, {
-            title: "Your report has an update",
-            message: `Your report on "${updated.page_label}" is now ${statusLabel}.`,
-            type: "INFO",
-            action_url: reportActionUrl(reportId),
-        });
-
-        // Live-refresh the reporter's own views plus every developer's shared
-        // reports table/dashboard — not just the reporter, since any developer
-        // watching the list should see the status change without a manual refresh.
-        const developerStaffIds = await this.getDeveloperStaffIds(actorStaffId);
-        WebSocketPublisher.reportUpdated(reportId, [updated.reported_by_staff_id, ...developerStaffIds]);
-
-        return updated;
-    }
-
-    private async authorizeAccess(reportId: number, actorStaffId: number, isDeveloper: boolean) {
-        const report = await this.reportRepository.getDetail(reportId);
-        if (!report) {
-            throw new AppError(404, ErrorCode.NOT_FOUND, "Report not found");
+        let sent = 0;
+        for (const { report_id } of pending) {
+            if (await this.sendReportEmail(report_id)) sent++;
         }
 
-        if (!isDeveloper && report.reported_by_staff_id !== actorStaffId) {
-            throw new AppError(403, ErrorCode.FORBIDDEN, "You do not have access to this report");
-        }
-
-        return report;
-    }
-
-    public async getReportDetail(reportId: number, actorStaffId: number, isDeveloper: boolean) {
-        const report = await this.authorizeAccess(reportId, actorStaffId, isDeveloper);
-        const messages = await this.reportRepository.getMessages(reportId);
-        return { report, messages };
-    }
-
-    public async postMessage(reportId: number, actorStaffId: number, isDeveloper: boolean, message: string) {
-        const report = await this.authorizeAccess(reportId, actorStaffId, isDeveloper);
-
-        const created = await this.reportRepository.addMessage(reportId, actorStaffId, message);
-
-        const isReporterReplying = actorStaffId === report.reported_by_staff_id;
-        const developerStaffIds = await this.getDeveloperStaffIds(isReporterReplying ? actorStaffId : undefined);
-
-        // Bell notification goes only to the other party in this exchange —
-        // the reporter isn't a "developer" fan-out target, and a developer
-        // replying only needs to ping the reporter, not every other developer.
-        const notifyRecipientIds = isReporterReplying ? developerStaffIds : [report.reported_by_staff_id];
-
-        const senderName = `${created.sender.first_name} ${created.sender.last_name}`;
-
-        await Promise.all(notifyRecipientIds.map((staffId) =>
-            this.notificationService.notify(staffId, {
-                title: `New reply from ${senderName}`,
-                message: `On "${report.page_label}": ${message}`,
-                type: "INFO",
-                action_url: reportActionUrl(reportId),
-            })
-        ));
-
-        // Live-refresh everyone with a stake in this report — the reporter and
-        // every developer — so the Developer Dashboard table, "Your Reports"
-        // tab, and any open conversation all reflect the new message live.
-        const allStakeholderIds = isReporterReplying
-            ? developerStaffIds
-            : [report.reported_by_staff_id, ...developerStaffIds];
-        WebSocketPublisher.reportUpdated(reportId, allStakeholderIds);
-
-        return created;
+        return { attempted: pending.length, sent, failed: pending.length - sent };
     }
 }
