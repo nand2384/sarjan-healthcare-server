@@ -25,6 +25,14 @@ const logger = pino({
             "accessToken",
             "refreshToken",
             "token",
+            // PII: WhatsApp/email recipient, phone numbers, and template
+            // params (which can carry an OTP code, patient/doctor names,
+            // etc. — see whatsapp.service.ts). Redact wholesale rather than
+            // picking fields out of bodyParams' array shape.
+            "to",
+            "whatsappNumber",
+            "bodyParams",
+            "email",
         ],
         remove: true,
     },

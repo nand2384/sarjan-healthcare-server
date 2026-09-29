@@ -444,7 +444,10 @@ export class AuthService {
                 resetLink,
             });
         } catch (error) {
-            logger.error({ err: error }, `Failed to send password reset email to ${email}`);
+            // email as a structured field (redacted by the logger), not
+            // interpolated into the message — pino's redact only strips
+            // known fields, never substrings of an already-formatted message.
+            logger.error({ err: error, email }, "Failed to send password reset email");
         }
 
         return { success: true, message: "If an account exists with that email, you will receive password reset instructions." };
